@@ -78,11 +78,11 @@ int init_DPDK_port(uint16_t portid, uint16_t nb_rx_queue, uint16_t nb_tx_queue) 
 		return retval;
 	}
 
-	// // adjust and set up the number of RX/TX descriptors
-	// retval = rte_eth_dev_adjust_nb_rx_tx_desc(portid, &nb_rxd, &nb_txd);
-	// if(retval != 0) {
-	// 	return retval;
-	// }
+	// adjust and set up the number of RX/TX descriptors
+	retval = rte_eth_dev_adjust_nb_rx_tx_desc(portid, &nb_rxd, &nb_txd);
+	if(retval != 0) {
+		return retval;
+	}
 
 	struct rte_eth_rxconf rx_conf = dev_info.default_rxconf;
 	rx_conf.offloads = port_conf.rxmode.offloads;
