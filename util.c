@@ -212,7 +212,7 @@ int app_parse_args(int argc, char **argv) {
 			srv_iterations0 = process_int_arg(optarg);
 			break;
 		
-		// iterations2 on the server
+		// iterations on the server
 		case 'j':
 			srv_iterations1 = process_int_arg(optarg);
 			break;
