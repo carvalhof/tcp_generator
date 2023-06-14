@@ -41,6 +41,8 @@ typedef struct lcore_parameters {
 typedef struct timestamp_node_t {
 	uint64_t timestamp_rx;
 	uint64_t timestamp_tx;
+	uint64_t flow_id;
+	uint64_t worker_id;
 } node_t;
 
 typedef struct application_node_t {

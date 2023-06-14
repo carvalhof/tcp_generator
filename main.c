@@ -277,33 +277,22 @@ static int lcore_tx(void *arg) {
 		fill_tcp_packet(block, pkt);
 
 		// check the receive window for this flow
-		// uint16_t rx_wnd = rte_atomic16_read(&block->tcb_rwin);
-		// while(unlikely(rx_wnd < tcp_payload_size)) { 
-		// 	rx_wnd = rte_atomic16_read(&block->tcb_rwin);
-		// }
+		uint16_t rx_wnd = rte_atomic16_read(&block->tcb_rwin);
+		while(unlikely(rx_wnd < tcp_payload_size)) { 
+			rx_wnd = rte_atomic16_read(&block->tcb_rwin);
+		}
 
-		// fill the timestamp into the packet payload
+		// fill the timestamp, flow id, server iterations, and server randomness into the packet payload
 		fill_payload_pkt(pkt, 0, next_tsc);
+		fill_payload_pkt(pkt, 2, (uint64_t) flow_id);
 		fill_payload_pkt(pkt, 4, app_array[i].iterations);
 		fill_payload_pkt(pkt, 5, app_array[i].randomness);
 
 		// sleep for while
 		while (rte_rdtsc() < next_tsc) { }
 
-		// struct rte_mbuf *cloned1 = rte_pktmbuf_clone(pkt, pktmbuf_pool_tx);
-		// struct rte_mbuf *cloned2 = rte_pktmbuf_clone(cloned1, pktmbuf_pool_tx);
-		// printf("count = %u/%u\n", rte_mempool_in_use_count(pktmbuf_pool_tx), rte_mempool_avail_count(pktmbuf_pool_tx));
-
-		// // send the packet
-		// rte_eth_tx_burst(portid, qid, &cloned2, 1);
-		// // rte_eth_tx_burst(portid, qid, &cloned, 1);
-
-		// rte_pktmbuf_free(cloned1);
-		// rte_pktmbuf_free(pkt);
-
 		// send the packet
 		rte_eth_tx_burst(portid, qid, &pkt, 1);
-
 
 		// update the counter
 		next_tsc += interarrival_gap[i];
