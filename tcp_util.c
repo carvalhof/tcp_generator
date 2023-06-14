@@ -230,7 +230,7 @@ void fill_tcp_packet(tcp_control_block_t *block, struct rte_mbuf *pkt) {
 	tcp_hdr->sent_seq = sent_seq;
 	tcp_hdr->recv_ack = rte_atomic32_read(&block->tcb_next_ack);
 	tcp_hdr->rx_win = 0xFFFF;
-	tcp_hdr->tcp_flags = RTE_TCP_ACK_FLAG;
+	tcp_hdr->tcp_flags = RTE_TCP_PSH_FLAG|RTE_TCP_ACK_FLAG;
 	tcp_hdr->tcp_urp = 0;
 	tcp_hdr->cksum = 0;
 
