@@ -332,7 +332,7 @@ void print_stats_output() {
 	for(; j < incoming_idx; j++) {
 		cur = &incoming_array[j];
 
-		fprintf(fp, "%lu\t%lu\t%02lx\n", 
+		fprintf(fp, "%lu\t%lu\t0x%02lx\n", 
 			((uint64_t)((cur->timestamp_rx - cur->timestamp_tx)/((double)TICKS_PER_US/1000))),
 			cur->flow_id,
 			cur->worker_id
