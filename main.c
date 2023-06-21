@@ -97,11 +97,15 @@ int process_rx_pkt(struct rte_mbuf *pkt, node_t *incoming, uint32_t *incoming_id
 	uint64_t *payload = (uint64_t *)(((uint8_t*) tcp_hdr) + ((tcp_hdr->data_off >> 4)*4));
 	uint64_t t0 = payload[0];
 	uint64_t t1 = payload[1];
+	uint64_t f_id = payload[2];
+	uint64_t w_id = payload[3];
 
 	// fill the node previously allocated
 	node_t *node = &incoming[(*incoming_idx)++];
 	node->timestamp_tx = t0;
 	node->timestamp_rx = t1;
+	node->flow_id = f_id;
+	node->worker_id = w_id;
 
 	return 1;
 }
