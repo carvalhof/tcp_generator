@@ -17,9 +17,6 @@
 #include <rte_malloc.h>
 #include <rte_mempool.h>
 
-#define UNIFORM_VALUE				0
-#define EXPONENTIAL_VALUE			1
-
 // TCP State enum
 typedef enum {
 	TCP_INIT,

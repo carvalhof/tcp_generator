@@ -25,9 +25,10 @@
 #define EPSILON						0.00001
 #define MAXSTRLEN					128
 #define MIN_PKTSIZE					96
-#define UNIFORM_VALUE				0
-#define EXPONENTIAL_VALUE			1
-#define BIMODAL_VALUE				2
+#define CONSTANT_VALUE				0
+#define UNIFORM_VALUE				1
+#define EXPONENTIAL_VALUE			2
+#define BIMODAL_VALUE				3
 #define IPV4_ADDR(a, b, c, d)		(((d & 0xff) << 24) | ((c & 0xff) << 16) | ((b & 0xff) << 8) | (a & 0xff))
 
 #define PAYLOAD_OFFSET				14+20+20

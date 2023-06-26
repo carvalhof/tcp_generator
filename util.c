@@ -39,7 +39,7 @@ void create_application_array() {
 			rte_exit(EXIT_FAILURE, "Cannot alloc the application array.\n");
 		}
 
-		if(srv_distribution == UNIFORM_VALUE) {
+		if(srv_distribution == CONSTANT_VALUE) {
 			for(uint32_t j = 0; j < nr_elements_per_queue; j++) {
 				application_array[i][j].iterations = srv_iterations0;
 				application_array[i][j].randomness = rte_rand();
@@ -192,9 +192,9 @@ int app_parse_args(int argc, char **argv) {
 
 		// distribution on the server
 		case 'D':
-			if(strcmp(optarg, "uniform") == 0) {
-				// Uniform distribution
-				srv_distribution = UNIFORM_VALUE;
+			if(strcmp(optarg, "constant") == 0) {
+				// Constant
+				srv_distribution = CONSTANT_VALUE;
 			} else if(strcmp(optarg, "exponential") == 0) {
 				// Exponential distribution
 				srv_distribution = EXPONENTIAL_VALUE;
