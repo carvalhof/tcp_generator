@@ -65,6 +65,9 @@ double srv_mode;
 uint64_t srv_iterations0;
 uint64_t srv_iterations1;
 uint64_t srv_distribution;
+char csv_filename[MAXSTRLEN];
+char csv_start_time[MAXSTRLEN];
+char csv_end_time[MAXSTRLEN];
 
 extern uint64_t TICKS_PER_US;
 extern uint32_t *nr_never_sent;

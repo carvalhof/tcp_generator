@@ -23,6 +23,65 @@ static double process_double_arg(const char *arg) {
 	return strtod(arg, &end);
 }
 
+inline void process(char *token, uint32_t skip_first) {
+	char *ret __attribute__((unused));
+	if(skip_first == 1)
+		ret = strtok(NULL, ",");
+	
+	for(uint32_t i = 0; i < 11; i++) {
+		ret = strtok(NULL, ",");
+		printf("%s\n", ret);
+	}
+	// In this point, the 
+}
+
+// Process the CSV file, creating the auxiliary structures
+void process_csv_file() {
+
+	char buffer[MAXSTRLEN];
+	FILE* fp = fopen(csv_filename, "r");
+	if(!fp) {
+		fprintf(stderr, "Error: %s\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	uint32_t nr_csv_lines = 1000; //get_nr_lines(fp);
+	rewind(fp);
+
+	uint32_t offset = rand() % (nr_csv_lines - 2*duration);
+
+	// Skipping the first line
+	char* ret __attribute__((unused)) = fgets(buffer, MAXSTRLEN, fp);
+
+	// Reading until reach to the 'offset' line
+	for(uint32_t i = 0; i < nr_csv_lines; i++) {
+		ret = fgets(buffer, MAXSTRLEN, fp);
+	}
+
+	// Structure of the CSV file
+	// Time,P0,P10,P20,P30,P40,P50,P60,P70,P80,P90,P100,QPS,Queries,Load
+
+	// 1st iteration
+	// Read the line
+	ret = fgets(buffer, MAXSTRLEN, fp);
+	// Tokenizer the buffer
+	char *token = strtok(buffer, ",");
+	// Store the first time
+	strcpy(csv_start_time, token);
+	// Process the first entry
+	process(token, 0);
+
+	// // Go on
+	// for(uint32_t i = 1; i < 2*duration - 1; i++) {
+	// 	ret = fgets(buffer, MAXSTRLEN, fp);
+
+	// 	// Tokenizer the buffer
+	// 	char *token = strtok(buffer, ",");
+
+	// 	//
+	// }
+}
+
 // Allocate and create all application nodes
 void create_application_array() {
 	uint64_t rate_per_queue = rate/nr_queues;
@@ -174,7 +233,7 @@ int app_parse_args(int argc, char **argv) {
 	char *prgname = argv[0];
 
 	argvopt = argv;
-	while ((opt = getopt(argc, argvopt, "d:r:f:s:q:p:t:c:o:e:D:i:j:m:")) != EOF) {
+	while ((opt = getopt(argc, argvopt, "d:r:f:s:p:t:c:C:o:e:D:i:j:m:")) != EOF) {
 		switch (opt) {
 		// distribution on the client
 		case 'd':
@@ -246,12 +305,6 @@ int app_parse_args(int argc, char **argv) {
 			duration = process_int_arg(optarg);
 			break;
 		
-		// queues
-		case 'q':
-			nr_queues = process_int_arg(optarg);
-			min_lcores = 1 + 2 + nr_queues;
-			break;
-
 		// seed
 		case 'e':
 			seed = process_int_arg(optarg);
@@ -262,6 +315,11 @@ int app_parse_args(int argc, char **argv) {
 			process_config_file(optarg);
 			break;
 		
+		// CSV file
+		case 'C':
+			strcpy(csv_filename, optarg);
+			break;
+
 		// output mode
 		case 'o':
 			strcpy(output_file, optarg);
