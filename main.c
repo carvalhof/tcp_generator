@@ -13,11 +13,9 @@
 #include "dpdk_util.h"
 
 // Application parameters
-uint64_t rate;
 uint32_t seed;
 uint64_t duration;
 uint64_t nr_flows;
-uint64_t nr_queues;
 uint64_t nr_packets;
 uint32_t min_lcores;
 uint32_t frame_size;
@@ -26,8 +24,8 @@ uint32_t tcp_payload_size;
 // General variables
 uint64_t TICKS_PER_US;
 uint16_t *flow_indexes_array;
-uint32_t **interarrival_array;
-application_node_t **application_array;
+uint32_t *interarrival_array;
+application_node_t *application_array;
 
 // Heap and DPDK allocated
 uint32_t incoming_idx;
@@ -40,7 +38,7 @@ tcp_control_block_t *tcp_control_blocks;
 uint8_t quit_rx = 0;
 uint8_t quit_tx = 0;
 uint8_t quit_rx_ring = 0;
-uint32_t *nr_never_sent = 0;
+uint32_t nr_never_sent = 0;
 lcore_param lcore_params[RTE_MAX_LCORE];
 struct rte_ring *rx_ring;
 
@@ -131,7 +129,7 @@ void start_client(uint16_t portid) {
 
 		// send the SYN packet
 		struct rte_mbuf *syn_cloned = rte_pktmbuf_clone(syn_packet, pktmbuf_pool_tx);
-		nb_tx = rte_eth_tx_burst(portid, i % nr_queues, &syn_cloned, 1);
+		nb_tx = rte_eth_tx_burst(portid, 0, &syn_cloned, 1);
 		if(nb_tx != 1) {
 			rte_exit(EXIT_FAILURE, "Error to send the TCP SYN packet.\n");
 		}
@@ -154,7 +152,7 @@ void start_client(uint16_t portid) {
 				
 				if(pkt) {
 					// send the TCP ACK packet to the server
-					nb_tx = rte_eth_tx_burst(portid, i % nr_queues, &pkt, 1);
+					nb_tx = rte_eth_tx_burst(portid, 0, &pkt, 1);
 					if(nb_tx != 1) {
 						rte_exit(EXIT_FAILURE, "Error to send the TCP ACK packet.\n");
 					}
@@ -166,7 +164,7 @@ void start_client(uint16_t portid) {
 			if((rte_rdtsc() - ts_syn) > (nb_retransmission * HANDSHAKE_TIMEOUT_IN_US) * TICKS_PER_US) {
 				nb_retransmission++;
 				syn_cloned = rte_pktmbuf_clone(syn_packet, pktmbuf_pool_tx);
-				nb_tx = rte_eth_tx_burst(portid, i % nr_queues, &syn_cloned, 1);
+				nb_tx = rte_eth_tx_burst(portid, 0, &syn_cloned, 1);
 				if(nb_tx != 1) {
 					rte_exit(EXIT_FAILURE, "Error to send the TCP SYN packet.\n");
 				}
@@ -259,8 +257,8 @@ static int lcore_tx(void *arg) {
 
 	struct rte_mbuf *pkt;
 	uint16_t *flow_indexes = flow_indexes_array;
-	uint32_t *interarrival_gap = interarrival_array[qid];
-	application_node_t *app_array = application_array[qid];
+	uint32_t *interarrival_gap = interarrival_array;
+	application_node_t *app_array = application_array;
 
 	uint64_t next_tsc = rte_rdtsc() + interarrival_gap[0];
 
@@ -268,7 +266,7 @@ static int lcore_tx(void *arg) {
 		// unable to keep up with the requested rate
 		if(unlikely(rte_rdtsc() > (next_tsc + 5*TICKS_PER_US))) {
 			// count this batch as dropped
-			nr_never_sent[qid]++;
+			nr_never_sent++;
 			next_tsc += (interarrival_gap[i] + TICKS_PER_US);
 			continue;
 		}
@@ -325,23 +323,9 @@ int main(int argc, char **argv) {
 
 	// initialize DPDK
 	uint16_t portid = 0;
-	init_DPDK(portid, nr_queues, seed);
+	init_DPDK(portid, 1, seed);
 
 	process_csv_file();
-
-	return 0;
-
-	// create nodes for incoming packets
-	create_incoming_array();
-
-	// create flow indexes array
-	create_flow_indexes_array();
-
-	// create interarrival array
-	create_interarrival_array();
-
-	// create application array
-	create_application_array();
 
 	// initialize TCP control blocks
 	init_tcp_blocks();
@@ -361,15 +345,13 @@ int main(int argc, char **argv) {
 	id_lcore = rte_get_next_lcore(id_lcore, 1, 1);
 	rte_eal_remote_launch(lcore_rx, NULL, id_lcore);
 
-	// start TX threads
-	for(int i = 0; i < nr_queues; i++) {
-		lcore_params[i].portid = portid;
-		lcore_params[i].qid = i;
-		lcore_params[i].nr_elements = (rate/nr_queues) * 2 * duration;
+	// start TX thread
+	lcore_params[0].portid = portid;
+	lcore_params[0].qid = 0;
+	lcore_params[0].nr_elements = nr_packets;
 
-		id_lcore = rte_get_next_lcore(id_lcore, 1, 1);
-		rte_eal_remote_launch(lcore_tx, (void*) &lcore_params[i], id_lcore);
-	}
+	id_lcore = rte_get_next_lcore(id_lcore, 1, 1);
+	rte_eal_remote_launch(lcore_tx, (void*) &lcore_params[0], id_lcore);
 
 	// wait for duration parameter
 	wait_timeout();

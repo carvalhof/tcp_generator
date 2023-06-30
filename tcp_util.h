@@ -83,7 +83,6 @@ extern uint64_t srv_distribution;
 extern uint64_t srv_instructions;
 
 extern uint64_t nr_flows;
-extern uint64_t nr_queues;
 extern uint32_t frame_size;
 extern uint32_t tcp_payload_size;
 extern struct rte_mempool *pktmbuf_pool_rx;

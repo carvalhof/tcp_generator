@@ -50,7 +50,7 @@ uint64_t get_nr_packets(FILE *fp, uint32_t offset) {
 	}
 
 	// Couting the number of packets considering the duration
-	uint64_t nr_packets = 0;
+	uint64_t n = 0;
 	for(uint32_t i = 0; i < 2*duration; i++) {
 		ret = fgets(buffer, MAXSTRLEN, fp);
 		char *token = strtok(buffer, ",");
@@ -58,27 +58,40 @@ uint64_t get_nr_packets(FILE *fp, uint32_t offset) {
 			token = strtok(NULL, ",");
 		}
 		token = strtok(NULL, ",");
-		nr_packets += atoi(token);
+		int x = atoi(token);
+		n += x;
 	}
 
-	return nr_packets;
+	return n;
 }
 
 inline void process(char *token, uint32_t skip_first) {
 	char *ret __attribute__((unused));
-	if(skip_first == 1)
-		ret = strtok(NULL, ",");
-	
+	if(skip_first == 1) {
+		ret = strtok(token, ",");
+	}
+
+	// Get the percentiles, choose one, and update the application_array
 	uint32_t arr[PERCENTILES];
 	for(uint32_t i = 0; i < PERCENTILES; i++) {
 		ret = strtok(NULL, ",");
-		arr[i] = atoi(ret);
+		arr[i] = 0;//atoi(ret);
 	}
 
-	uint32_t i = rand() % PERCENTILES;
-	printf("We choose = %d", arr[i]);
+	// Get the number of packets 
+	ret = strtok(NULL, ","); // Skip the QPS
+	uint32_t queries = 1;//atoi(ret);
+	double mean = (1.0/queries) * 1000000.0;
 
-	// In this point, the 
+	// Distributed the packets uniformly within 1-sec window
+	// Distributed the service time uniformly
+	for(uint32_t i = 0; i < queries; i++) {
+		uint32_t j = rand() % PERCENTILES;
+		application_array[idx].iterations = arr[j];
+		application_array[idx].randomness = rand();
+		interarrival_array[idx] = mean * TICKS_PER_US;
+		idx++;
+	}
 }
 
 // Process the CSV file, creating the auxiliary structures
@@ -90,14 +103,9 @@ void process_csv_file() {
 		exit(EXIT_FAILURE);
 	}
 
+	idx = 0;
 	uint32_t nr_csv_lines = get_nr_lines(fp);
 	rewind(fp);
-
-	// Here I need to create the array of application and the incoming based of the duration and packets
-	// create_flow_indexes_array(); aqui tem que saber o fluxo baseado na quantidade de pacotes que hoje eh unknown
-	// create_interarrival_array(); // isso tem que ser criado junto
-	// create_application_array();
-
 
 	uint32_t offset = rand() % (nr_csv_lines - 2*duration);
 	nr_packets = get_nr_packets(fp, offset);
@@ -107,9 +115,17 @@ void process_csv_file() {
 	create_flow_indexes_array();
 
 	// Allocates an array for all outgoing packets
-	
+	interarrival_array = (uint32_t*) rte_malloc(NULL, nr_packets * sizeof(uint32_t), 64);
+	if(interarrival_array == NULL) {
+		rte_exit(EXIT_FAILURE, "Cannot alloc the interarrival_gap array.\n");
+	}
+	nr_never_sent = 0;
 
-	printf("%d %d\n", nr_csv_lines, nr_packets);
+	// Allocates an array for the service time
+	application_array = (application_node_t*) rte_malloc(NULL, nr_packets * sizeof(application_node_t), 64);
+	if(application_array == NULL) {
+		rte_exit(EXIT_FAILURE, "Cannot alloc the application array.\n");
+	}
 
 	// Skipping the first line
 	char* ret __attribute__((unused)) = fgets(buffer, MAXSTRLEN, fp);
@@ -118,9 +134,6 @@ void process_csv_file() {
 	for(uint32_t i = 0; i < offset; i++) {
 		ret = fgets(buffer, MAXSTRLEN, fp);
 	}
-
-	// Structure of the CSV file
-	// Time,P0,P10,P20,P30,P40,P50,P60,P70,P80,P90,P100,QPS,Queries,Load
 
 	// 1st iteration
 	// Read the line
@@ -132,55 +145,16 @@ void process_csv_file() {
 	// Process the first entry
 	process(token, 0);
 
-	// // Go on
-	// for(uint32_t i = 1; i < 2*duration - 1; i++) {
-	// 	ret = fgets(buffer, MAXSTRLEN, fp);
-
-	// 	// Tokenizer the buffer
-	// 	char *token = strtok(buffer, ",");
-
-	// 	//
-	// }
-}
-
-// Allocate and create all application nodes
-void create_application_array() {
-	uint64_t rate_per_queue = rate/nr_queues;
-	uint64_t nr_elements_per_queue = (2 * rate_per_queue * duration);
-
-	application_array = (application_node_t**) rte_malloc(NULL, nr_queues * sizeof(application_node_t*), 64);
-	if(application_array == NULL) {
-		rte_exit(EXIT_FAILURE, "Cannot alloc the application array.\n");
+	for(uint32_t i = 1; i < 2*duration - 1; i++) {
+		ret = fgets(buffer, MAXSTRLEN, fp);
+		process(ret, 1);
 	}
 
-	for(uint64_t i = 0; i < nr_queues; i++) {
-		application_array[i] = (application_node_t*) rte_malloc(NULL, nr_elements_per_queue * sizeof(application_node_t), 0);
-		if(application_array[i] == NULL) {
-			rte_exit(EXIT_FAILURE, "Cannot alloc the application array.\n");
-		}
-
-		if(srv_distribution == CONSTANT_VALUE) {
-			for(uint32_t j = 0; j < nr_elements_per_queue; j++) {
-				application_array[i][j].iterations = srv_iterations0;
-				application_array[i][j].randomness = rte_rand();
-			}
-		} else if(srv_distribution == EXPONENTIAL_VALUE) {
-			for(uint32_t j = 0; j < nr_elements_per_queue; j++) {
-				double u = rte_drand();
-				application_array[i][j].iterations = (uint64_t) (-((double)srv_iterations0) * log(u));
-				application_array[i][j].randomness = rte_rand();
-			}
-		} else {
-			for(uint32_t j = 0; j < nr_elements_per_queue; j++) {
-				double u = rte_drand();
-				if(u < srv_mode) {
-					application_array[i][j].iterations = srv_iterations0;
-				} else {
-					application_array[i][j].iterations = srv_iterations1;
-				}
-			}
-		}
-	}
+	// Last iteration
+	ret = fgets(buffer, MAXSTRLEN, fp);
+	token = strtok(buffer, ",");
+	strcpy(csv_end_time, token);
+	process(token, 0);
 }
 
 // Allocate nodes for all incoming packets
@@ -190,39 +164,6 @@ void create_incoming_array() {
 		rte_exit(EXIT_FAILURE, "Cannot alloc the incoming array.\n");
 	}
 } 
-
-// Allocate an array for all interarrival packets
-// void create_interarrival_array() {
-// 	interarrival_array = (uint32_t**) rte_malloc(NULL, nr_queues * sizeof(uint32_t*), 64);
-// 	if(interarrival_array == NULL) {
-// 		rte_exit(EXIT_FAILURE, "Cannot alloc the interarrival_gap array.\n");
-// 	}
-
-// 	nr_never_sent = (uint32_t*) rte_zmalloc(NULL, nr_queues * sizeof(uint32_t), 64);
-// 	if(nr_never_sent == NULL) {
-// 		rte_exit(EXIT_FAILURE, "Cannot alloc the nr_never_sent array.\n");
-// 	}
-
-// 	for(uint64_t i = 0; i < nr_queues; i++) {
-// 		interarrival_array[i] = (uint32_t*) rte_malloc(NULL, nr_elements_per_queue * sizeof(uint32_t), 0);
-// 		if(interarrival_array[i] == NULL) {
-// 			rte_exit(EXIT_FAILURE, "Cannot alloc the interarrival_gap array.\n");
-// 		}
-		
-// 		uint32_t *interarrival_gap = interarrival_array[i];
-// 		if(distribution == UNIFORM_VALUE) {
-// 			double mean = (1.0/rate_per_queue) * 1000000.0;
-// 			for(uint64_t j = 0; j < nr_elements_per_queue; j++) {
-// 				interarrival_gap[j] = mean * TICKS_PER_US;
-// 			}
-// 		} else {
-// 			double lambda = 1.0/(1000000.0/rate_per_queue);
-// 			for(uint64_t j = 0; j < nr_elements_per_queue; j++) {
-// 				interarrival_gap[j] = sample(lambda) * TICKS_PER_US;
-// 			}
-// 		}
-// 	} 
-// }
 
 // Allocate and create an array for all flow indentier to send to the server
 void create_flow_indexes_array() {
@@ -248,7 +189,6 @@ void clean_heap() {
 static void usage(const char *prgname) {
 	printf("%s [EAL options] -- \n"
 		"  -d DISTRIBUTION: <uniform|exponential>\n"
-		"  -r RATE: rate in pps\n"
 		"  -f FLOWS: number of flows\n"
 		"  -s SIZE: frame size in bytes\n"
 		"  -t TIME: time in seconds to send packets\n"
@@ -318,11 +258,6 @@ int app_parse_args(int argc, char **argv) {
 			srv_mode = process_double_arg(optarg);
 			break;
 
-		// rate (pps)
-		case 'r':
-			rate = process_int_arg(optarg);
-			break;
-
 		// flows
 		case 'f':
 			nr_flows = process_int_arg(optarg);
@@ -372,10 +307,6 @@ int app_parse_args(int argc, char **argv) {
 		argv[optind - 1] = prgname;
 	}
 
-	if(nr_flows < nr_queues) {
-		rte_exit(EXIT_FAILURE, "The number of flows should be bigger than the number of queues.\n");
-	}
-
 	ret = optind-1;
 	optind = 1;
 
@@ -409,18 +340,15 @@ void print_stats_output() {
 		rte_exit(EXIT_FAILURE, "Cannot open the output file.\n");
 	}
 
-	uint64_t total_never_sent = 0;
-	for(uint32_t i = 0; i < nr_queues; i++) {
-		total_never_sent += nr_never_sent[i];
-	}
-	if((incoming_idx + total_never_sent) != 2 * rate * duration) {
+	uint64_t total_never_sent = nr_never_sent;
+	if((incoming_idx + total_never_sent) != nr_packets) {
 		printf("ERROR: received %d and %ld never sent\n", incoming_idx, total_never_sent);
 		fclose(fp);
 		return;
 	}
 
 	printf("\nincoming_idx = %d -- never_sent = %ld\n", incoming_idx, total_never_sent);
-	uint64_t j = rate * duration - total_never_sent;
+	uint64_t j = nr_packets/2;
 
 	// print the RTT latency in (ns)
 	node_t *cur;
