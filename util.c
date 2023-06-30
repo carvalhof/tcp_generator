@@ -107,6 +107,7 @@ void process_csv_file() {
 	create_flow_indexes_array();
 
 	// Allocates an array for all outgoing packets
+	
 
 	printf("%d %d\n", nr_csv_lines, nr_packets);
 
