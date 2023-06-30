@@ -23,21 +23,66 @@ static double process_double_arg(const char *arg) {
 	return strtod(arg, &end);
 }
 
+uint32_t get_nr_lines(FILE *fp) {
+	char buffer[MAXSTRLEN];
+
+	// Skipping the first line
+	char* ret __attribute__((unused)) = fgets(buffer, MAXSTRLEN, fp);
+
+	// Counting the number of lines
+	uint32_t nr_lines = 0;
+	while(fgets(buffer, MAXSTRLEN, fp)) {
+		nr_lines++;
+	}
+
+	return nr_lines;
+}
+
+uint64_t get_nr_packets(FILE *fp, uint32_t offset) {
+	char buffer[MAXSTRLEN];
+
+	// Skipping the first line
+	char* ret __attribute__((unused)) = fgets(buffer, MAXSTRLEN, fp);
+
+	// Skipping until reach to the 'offset' line
+	for(uint32_t i = 0; i < offset; i++) {
+		ret = fgets(buffer, MAXSTRLEN, fp);
+	}
+
+	// Couting the number of packets considering the duration
+	uint64_t nr_packets = 0;
+	for(uint32_t i = 0; i < 2*duration; i++) {
+		ret = fgets(buffer, MAXSTRLEN, fp);
+		char *token = strtok(buffer, ",");
+		for(uint32_t j = 0; j < 12; j++) {
+			token = strtok(NULL, ",");
+		}
+		token = strtok(NULL, ",");
+		nr_packets += atoi(token);
+	}
+
+	return nr_packets;
+}
+
 inline void process(char *token, uint32_t skip_first) {
 	char *ret __attribute__((unused));
 	if(skip_first == 1)
 		ret = strtok(NULL, ",");
 	
-	for(uint32_t i = 0; i < 11; i++) {
+	uint32_t arr[PERCENTILES];
+	for(uint32_t i = 0; i < PERCENTILES; i++) {
 		ret = strtok(NULL, ",");
-		printf("%s\n", ret);
+		arr[i] = atoi(ret);
 	}
+
+	uint32_t i = rand() % PERCENTILES;
+	printf("We choose = %d", arr[i]);
+
 	// In this point, the 
 }
 
 // Process the CSV file, creating the auxiliary structures
 void process_csv_file() {
-
 	char buffer[MAXSTRLEN];
 	FILE* fp = fopen(csv_filename, "r");
 	if(!fp) {
@@ -45,16 +90,31 @@ void process_csv_file() {
 		exit(EXIT_FAILURE);
 	}
 
-	uint32_t nr_csv_lines = 1000; //get_nr_lines(fp);
+	uint32_t nr_csv_lines = get_nr_lines(fp);
 	rewind(fp);
 
+	// Here I need to create the array of application and the incoming based of the duration and packets
+	// create_flow_indexes_array(); aqui tem que saber o fluxo baseado na quantidade de pacotes que hoje eh unknown
+	// create_interarrival_array(); // isso tem que ser criado junto
+	// create_application_array();
+
+
 	uint32_t offset = rand() % (nr_csv_lines - 2*duration);
+	nr_packets = get_nr_packets(fp, offset);
+	rewind(fp);
+
+	create_incoming_array();
+	create_flow_indexes_array();
+
+	// Allocates an array for all outgoing packets
+
+	printf("%d %d\n", nr_csv_lines, nr_packets);
 
 	// Skipping the first line
 	char* ret __attribute__((unused)) = fgets(buffer, MAXSTRLEN, fp);
 
-	// Reading until reach to the 'offset' line
-	for(uint32_t i = 0; i < nr_csv_lines; i++) {
+	// Skipping until reach to the 'offset' line
+	for(uint32_t i = 0; i < offset; i++) {
 		ret = fgets(buffer, MAXSTRLEN, fp);
 	}
 
@@ -122,79 +182,56 @@ void create_application_array() {
 	}
 }
 
-// Allocate and create all nodes for incoming packets
+// Allocate nodes for all incoming packets
 void create_incoming_array() {
-	incoming_array = (node_t*) rte_malloc(NULL, rate * duration * 2 * sizeof(node_t), 0);
+	incoming_array = (node_t*) rte_malloc(NULL, nr_packets * 1.4 * sizeof(node_t), 0);
 	if(incoming_array == NULL) {
 		rte_exit(EXIT_FAILURE, "Cannot alloc the incoming array.\n");
 	}
 } 
 
-// Allocate and create an array for all interarrival packets for rate specified.
-void create_interarrival_array() {
-	uint64_t rate_per_queue = rate/nr_queues;
-	uint64_t nr_elements_per_queue = 2 * rate_per_queue * duration;
+// Allocate an array for all interarrival packets
+// void create_interarrival_array() {
+// 	interarrival_array = (uint32_t**) rte_malloc(NULL, nr_queues * sizeof(uint32_t*), 64);
+// 	if(interarrival_array == NULL) {
+// 		rte_exit(EXIT_FAILURE, "Cannot alloc the interarrival_gap array.\n");
+// 	}
 
-	interarrival_array = (uint32_t**) rte_malloc(NULL, nr_queues * sizeof(uint32_t*), 64);
-	if(interarrival_array == NULL) {
-		rte_exit(EXIT_FAILURE, "Cannot alloc the interarrival_gap array.\n");
-	}
+// 	nr_never_sent = (uint32_t*) rte_zmalloc(NULL, nr_queues * sizeof(uint32_t), 64);
+// 	if(nr_never_sent == NULL) {
+// 		rte_exit(EXIT_FAILURE, "Cannot alloc the nr_never_sent array.\n");
+// 	}
 
-	nr_never_sent = (uint32_t*) rte_zmalloc(NULL, nr_queues * sizeof(uint32_t), 64);
-	if(nr_never_sent == NULL) {
-		rte_exit(EXIT_FAILURE, "Cannot alloc the nr_never_sent array.\n");
-	}
-
-	for(uint64_t i = 0; i < nr_queues; i++) {
-		interarrival_array[i] = (uint32_t*) rte_malloc(NULL, nr_elements_per_queue * sizeof(uint32_t), 0);
-		if(interarrival_array[i] == NULL) {
-			rte_exit(EXIT_FAILURE, "Cannot alloc the interarrival_gap array.\n");
-		}
+// 	for(uint64_t i = 0; i < nr_queues; i++) {
+// 		interarrival_array[i] = (uint32_t*) rte_malloc(NULL, nr_elements_per_queue * sizeof(uint32_t), 0);
+// 		if(interarrival_array[i] == NULL) {
+// 			rte_exit(EXIT_FAILURE, "Cannot alloc the interarrival_gap array.\n");
+// 		}
 		
-		uint32_t *interarrival_gap = interarrival_array[i];
-		if(distribution == UNIFORM_VALUE) {
-			double mean = (1.0/rate_per_queue) * 1000000.0;
-			for(uint64_t j = 0; j < nr_elements_per_queue; j++) {
-				interarrival_gap[j] = mean * TICKS_PER_US;
-			}
-		} else {
-			double lambda = 1.0/(1000000.0/rate_per_queue);
-			for(uint64_t j = 0; j < nr_elements_per_queue; j++) {
-				interarrival_gap[j] = sample(lambda) * TICKS_PER_US;
-			}
-		}
-	} 
-}
+// 		uint32_t *interarrival_gap = interarrival_array[i];
+// 		if(distribution == UNIFORM_VALUE) {
+// 			double mean = (1.0/rate_per_queue) * 1000000.0;
+// 			for(uint64_t j = 0; j < nr_elements_per_queue; j++) {
+// 				interarrival_gap[j] = mean * TICKS_PER_US;
+// 			}
+// 		} else {
+// 			double lambda = 1.0/(1000000.0/rate_per_queue);
+// 			for(uint64_t j = 0; j < nr_elements_per_queue; j++) {
+// 				interarrival_gap[j] = sample(lambda) * TICKS_PER_US;
+// 			}
+// 		}
+// 	} 
+// }
 
 // Allocate and create an array for all flow indentier to send to the server
 void create_flow_indexes_array() {
-	uint64_t rate_per_queue = rate/nr_queues;
-	uint64_t nr_elements_per_queue = 2 * rate_per_queue * duration;
-
-	flow_indexes_array = (uint16_t**) rte_malloc(NULL, nr_queues * sizeof(uint16_t*), 64);
+	flow_indexes_array = (uint16_t*) rte_malloc(NULL, nr_packets * sizeof(uint16_t), 0);
 	if(flow_indexes_array == NULL) {
 		rte_exit(EXIT_FAILURE, "Cannot alloc the flow_indexes array.\n");
 	}
 
-	for(uint64_t i = 0; i < nr_queues; i++) {
-		flow_indexes_array[i] = (uint16_t*) rte_malloc(NULL, nr_elements_per_queue * sizeof(uint16_t), 0);
-		if(flow_indexes_array[i] == NULL) {
-			rte_exit(EXIT_FAILURE, "Cannot alloc the flow_indexes array.\n");
-		}
-	}
-
-	uint32_t last[nr_queues];
-	memset(last, 0, nr_queues * sizeof(uint32_t));
-
-	for(uint64_t f = 0; f < nr_flows; f++) {
-		uint32_t idx = f % nr_queues;
-		flow_indexes_array[idx][last[idx]++] = f;
-	}
-
-	for(uint64_t q = 0; q < nr_queues; q++) {
-		for(uint32_t i = last[q]; i < nr_elements_per_queue; i++) {
-			flow_indexes_array[q][i] = flow_indexes_array[q][i % last[q]];
-		}
+	for(uint64_t i = 0; i < nr_packets; i++) {
+		flow_indexes_array[i] = i % nr_flows;
 	}
 }
 
@@ -214,7 +251,6 @@ static void usage(const char *prgname) {
 		"  -f FLOWS: number of flows\n"
 		"  -s SIZE: frame size in bytes\n"
 		"  -t TIME: time in seconds to send packets\n"
-		"  -q QUEUES: number of queues\n"
 		"  -e SEED: seed\n"
 		"  -D DISTRIBUTION: <uniform|exponential|bimodal> on the server\n"
 		"  -i INSTRUCTIONS: number of instructions on the server\n"

@@ -22,6 +22,7 @@
 #include <rte_mempool.h>
 
 // Constants
+#define PERCENTILES					11
 #define EPSILON						0.00001
 #define MAXSTRLEN					128
 #define MIN_PKTSIZE					96
@@ -57,6 +58,7 @@ extern uint16_t portid;
 extern uint64_t duration;
 extern uint64_t nr_flows;
 extern uint64_t nr_queues;
+extern uint64_t nr_packets;
 extern uint32_t frame_size;
 extern uint32_t min_lcores;
 extern uint32_t tcp_payload_size;
@@ -71,7 +73,7 @@ char csv_end_time[MAXSTRLEN];
 
 extern uint64_t TICKS_PER_US;
 extern uint32_t *nr_never_sent;
-extern uint16_t **flow_indexes_array;
+extern uint16_t *flow_indexes_array;
 extern uint32_t **interarrival_array;
 
 extern uint16_t dst_tcp_port;
@@ -92,6 +94,7 @@ void clean_heap();
 void wait_timeout();
 void print_dpdk_stats();
 void print_stats_output();
+void process_csv_file();
 void process_config_file();
 void create_incoming_array();
 void create_application_array();

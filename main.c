@@ -18,13 +18,14 @@ uint32_t seed;
 uint64_t duration;
 uint64_t nr_flows;
 uint64_t nr_queues;
+uint64_t nr_packets;
 uint32_t min_lcores;
 uint32_t frame_size;
 uint32_t tcp_payload_size;
 
 // General variables
 uint64_t TICKS_PER_US;
-uint16_t **flow_indexes_array;
+uint16_t *flow_indexes_array;
 uint32_t **interarrival_array;
 application_node_t **application_array;
 
@@ -257,7 +258,7 @@ static int lcore_tx(void *arg) {
 	uint64_t nr_elements = tx_conf->nr_elements;
 
 	struct rte_mbuf *pkt;
-	uint16_t *flow_indexes = flow_indexes_array[qid];
+	uint16_t *flow_indexes = flow_indexes_array;
 	uint32_t *interarrival_gap = interarrival_array[qid];
 	application_node_t *app_array = application_array[qid];
 
@@ -325,6 +326,10 @@ int main(int argc, char **argv) {
 	// initialize DPDK
 	uint16_t portid = 0;
 	init_DPDK(portid, nr_queues, seed);
+
+	process_csv_file();
+
+	return 0;
 
 	// create nodes for incoming packets
 	create_incoming_array();
