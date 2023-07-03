@@ -79,7 +79,7 @@ inline void process() {
 	// Distributed the service time uniformly
 	for(uint32_t i = 0; i < queries; i++) {
 		uint32_t j = rand();
-		application_array[idx].instructions = get_instructions_for_the_server(arr, j);
+		application_array[idx].instructions = 0;//get_instructions_for_the_server(arr, j);
 		application_array[idx].randomness = j;
 		interarrival_array[idx] = mean * TICKS_PER_US;
 		idx++;
