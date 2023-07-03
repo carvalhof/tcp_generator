@@ -48,8 +48,7 @@ typedef struct timestamp_node_t {
 } node_t;
 
 typedef struct application_node_t {
-	uint64_t iterations;
-	uint64_t randomness;
+	uint64_t service_time_in_us;
 } application_node_t;
 
 extern uint32_t seed;
@@ -62,10 +61,7 @@ extern uint32_t min_lcores;
 extern uint32_t tcp_payload_size;
 
 uint64_t idx;
-double srv_mode;
-uint64_t srv_iterations0;
-uint64_t srv_iterations1;
-uint64_t srv_distribution;
+uint64_t csv_offset;
 char csv_filename[MAXSTRLEN];
 char csv_start_time[MAXSTRLEN];
 char csv_end_time[MAXSTRLEN];

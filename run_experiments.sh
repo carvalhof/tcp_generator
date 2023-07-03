@@ -1,32 +1,35 @@
 #!/bin/bash
 
-RUNS=2
+RUNS=4
 PERCENTILE_1="50.0"
 PERCENTILE_2="99.9"
 
 SERVER_TIMEOUT=35
-SERVER_IP=130.127.134.57
+SERVER_IP=130.127.134.63
 SERVER_LAYOUT_LIST=("l1" "l2" "l3" "l4")
 SERVER_SEED_LIST=(1646203793 986508091 193720917 15335381 633882127 1093215650 772188468 711307909 645856549 1127581467 765061083 1050115427 4231379 1000215989 1382853168 1927405477 306097907 1344972625 2098183364 323989894)
-SERVER_APPLICATION="sqrt"
+SERVER_APPLICATION="null"
 SERVER_CORES="1,3,5,7,9,11,13,15,17,19,21,23,25,27,29"
-SERVER_APPLICATION_ITERATIONS_1=0	## Need to calibrate to correct service time
-SERVER_APPLICATION_ITERATIONS_2=0	## For bimodal
-SERVER_APPLICATION_DISTRIBUTION="constant"
 
-CLIENT_INTERARRIVAL="exponential"
 CLIENT_DURATION=10
-CLIENT_RATE_INITIAL=50000
-CLIENT_RATE_INCREMENTAL=50000
 CLIENT_PCI_NIC="ca:00.0"
 CLIENT_CORES="3,5,7,9"
 CLIENT_FLOWS=128
 CLIENT_SIZE=128
-CLIENT_QUEUES=1
 CLIENT_CONF_FILE="addr.cfg"
 CLIENT_OUTPUT_FILE="output.dat"
+CLIENT_CSV_FILE="csv.csv"
 
 TIMEOUT=$(( SERVER_TIMEOUT - CLIENT_DURATION - CLIENT_DURATION ))
+
+# offset   0  -- low load	(00-10)
+# offset 750  -- medium load 	(10-20)
+# offset 1285 -- high load 	(20-30)
+# offset 6620 -- super highload (30-90)
+
+CLIENT_OFFSET_RANGE=3
+CLIENT_OFFSET_VALUES=(0 750 1285 6620)
+CLIENT_OFFSET_NAMES=("low" "medium" "high" "super_high")
 
 error () {
 	local Z=1.96
@@ -58,17 +61,17 @@ for l in ${SERVER_LAYOUT_LIST[@]}; do
 		SERVER_NUMBER_OF_CORES="8"
 	fi
 
-	STOP=0
-	CLIENT_CURRENT_RATE=${CLIENT_RATE_INITIAL}
+	for i in `seq 0 ${CLIENT_OFFSET_RANGE}`; do
+		NAME=${CLIENT_OFFSET_NAMES[i]}
+		VALUE=${CLIENT_OFFSET_VALUES[i]}
 
-	while [ ${STOP} -eq 0 ]; do
-		DIR="results/$l/${CLIENT_CURRENT_RATE}"
+		DIR="results/$l/${NAME}"
 		rm -rf $DIR 
 		mkdir -p $DIR 
 		rm -rf ${CLIENT_OUTPUT_FILE}
 
 		for j in `seq 0 $RUNS`; do
-			echo "Layout: $l -- Run: $j/$RUNS -- Rate: ${CLIENT_CURRENT_RATE}"
+			echo "Layout: $l -- Run: $j/$RUNS -- Load: ${NAME}"
 
 			## Run the server
 			SERVER_SCRIPT_ARGS="${SERVER_NUMBER_OF_CORES} ${SERVER_APPLICATION}"
@@ -79,7 +82,7 @@ for l in ${SERVER_LAYOUT_LIST[@]}; do
 
 			## Run the client
 			SEED=${SERVER_SEED_LIST[j]}
-			sudo LD_LIBRARY_PATH=${HOME}/lib/x86_64-linux-gnu timeout ${SERVER_TIMEOUT} ./build/tcp-generator -a ${CLIENT_PCI_NIC} -n 4 -l ${CLIENT_CORES} -- -d ${CLIENT_INTERARRIVAL} -r ${CLIENT_CURRENT_RATE} -f ${CLIENT_FLOWS} -s ${CLIENT_SIZE} -t ${CLIENT_DURATION} -q ${CLIENT_QUEUES} -e ${SEED} -c ${CLIENT_CONF_FILE} -o ${CLIENT_OUTPUT_FILE} -D ${SERVER_APPLICATION_DISTRIBUTION} -i ${SERVER_APPLICATION_ITERATIONS_1} -j ${SERVER_APPLICATION_ITERATIONS_2} 1>/dev/null 2>/dev/null &
+			sudo LD_LIBRARY_PATH=${HOME}/lib/x86_64-linux-gnu timeout ${SERVER_TIMEOUT} ./build/tcp-generator -a ${CLIENT_PCI_NIC} -n 4 -l ${CLIENT_CORES} -- -f ${CLIENT_FLOWS} -s ${CLIENT_SIZE} -t ${CLIENT_DURATION} -e ${SEED} -c ${CLIENT_CONF_FILE} -o ${CLIENT_OUTPUT_FILE} -C ${CLIENT_CSV_FILE} -i ${VALUE} 1>/dev/null 2>/dev/null &
 
 			## Sleep a while
 			sleep ${SERVER_TIMEOUT}
@@ -87,15 +90,6 @@ for l in ${SERVER_LAYOUT_LIST[@]}; do
 
 			## Process the output file
 			if [ ! -f ${CLIENT_OUTPUT_FILE} ]; then
-				STOP=1
-				break
-			fi
-
-			REAL_N=`wc -l ${CLIENT_OUTPUT_FILE} | cut -d' ' -f1`
-			EXPECTATIVE_N=$(( (CLIENT_CURRENT_RATE * CLI_DURATION * 99) / 100 ))
-
-			if [[ ${REAL_N} -le ${EXPECTATIVE_N} ]]; then
-				STOP=1
 				break
 			fi
 
@@ -103,12 +97,11 @@ for l in ${SERVER_LAYOUT_LIST[@]}; do
 			scp ${SERVER_IP}:~/$l/demikernel/output.perf output$j.perf 1>/dev/null 2>/dev/null
 			mv output$j.perf $DIR 1>/dev/null 2>/dev/null
 
-			process ${CLIENT_OUTPUT_FILE} $DIR ${CLIENT_CURRENT_RATE} $j
+			process ${CLIENT_OUTPUT_FILE} $DIR ${NAME} $j
 		done
-		CLIENT_CURRENT_RATE=$(( CLIENT_CURRENT_RATE + CLIENT_RATE_INCREMENTAL ))
 	done
 done
 
 rm -rf .tmp 1>/dev/null 2>/dev/null
-rm -rf ${CLIENT_OUTPUT_FILE} 1>/dev/null 2>/dev/null
+#rm -rf ${CLIENT_OUTPUT_FILE} 1>/dev/null 2>/dev/null
 #ssh ${SERVER_IP} "echo 1 | sudo tee /proc/sys/kernel/nmi_watchdog" 1>/dev/null 2>/dev/null

@@ -285,11 +285,10 @@ static int lcore_tx(void *arg) {
 			rx_wnd = rte_atomic16_read(&block->tcb_rwin);
 		}
 
-		// fill the timestamp, flow id, server iterations, and server randomness into the packet payload
+		// fill the timestamp, flow id, and the service time into the packet payload
 		fill_payload_pkt(pkt, 0, next_tsc);
 		fill_payload_pkt(pkt, 2, (uint64_t) flow_id);
-		fill_payload_pkt(pkt, 4, app_array[i].iterations);
-		fill_payload_pkt(pkt, 5, app_array[i].randomness);
+		fill_payload_pkt(pkt, 4, app_array[i].service_time_in_us);
 
 		// sleep for while
 		while (rte_rdtsc() < next_tsc) { }

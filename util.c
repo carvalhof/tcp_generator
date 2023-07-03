@@ -16,28 +16,6 @@ static uint32_t process_int_arg(const char *arg) {
 	return strtoul(arg, &end, 10);
 }
 
-// Convert string type into double type
-static double process_double_arg(const char *arg) {
-	char *end;
-
-	return strtod(arg, &end);
-}
-
-uint32_t get_nr_lines(FILE *fp) {
-	char buffer[MAXSTRLEN];
-
-	// Skipping the first line
-	char* ret __attribute__((unused)) = fgets(buffer, MAXSTRLEN, fp);
-
-	// Counting the number of lines
-	uint32_t nr_lines = 0;
-	while(fgets(buffer, MAXSTRLEN, fp)) {
-		nr_lines++;
-	}
-
-	return nr_lines;
-}
-
 uint64_t get_nr_packets(FILE *fp, uint32_t offset) {
 	char buffer[MAXSTRLEN];
 
@@ -65,30 +43,27 @@ uint64_t get_nr_packets(FILE *fp, uint32_t offset) {
 	return n;
 }
 
-inline void process(char *token, uint32_t skip_first) {
+inline void process() {
 	char *ret __attribute__((unused));
-	if(skip_first == 1) {
-		ret = strtok(token, ",");
-	}
+	ret = strtok(NULL, ",");
 
 	// Get the percentiles, choose one, and update the application_array
 	uint32_t arr[PERCENTILES];
 	for(uint32_t i = 0; i < PERCENTILES; i++) {
 		ret = strtok(NULL, ",");
-		arr[i] = 0;//atoi(ret);
+		arr[i] = atoi(ret);
 	}
 
 	// Get the number of packets 
 	ret = strtok(NULL, ","); // Skip the QPS
-	uint32_t queries = 1;//atoi(ret);
+	uint32_t queries = atoi(ret);
 	double mean = (1.0/queries) * 1000000.0;
 
 	// Distributed the packets uniformly within 1-sec window
 	// Distributed the service time uniformly
 	for(uint32_t i = 0; i < queries; i++) {
 		uint32_t j = rand() % PERCENTILES;
-		application_array[idx].iterations = arr[j];
-		application_array[idx].randomness = rand();
+		application_array[idx].service_time_in_us = arr[j];
 		interarrival_array[idx] = mean * TICKS_PER_US;
 		idx++;
 	}
@@ -104,10 +79,7 @@ void process_csv_file() {
 	}
 
 	idx = 0;
-	uint32_t nr_csv_lines = get_nr_lines(fp);
-	rewind(fp);
-
-	uint32_t offset = rand() % (nr_csv_lines - 2*duration);
+	uint32_t offset = csv_offset;
 	nr_packets = get_nr_packets(fp, offset);
 	rewind(fp);
 
@@ -143,18 +115,19 @@ void process_csv_file() {
 	// Store the first time
 	strcpy(csv_start_time, token);
 	// Process the first entry
-	process(token, 0);
+	process();
 
 	for(uint32_t i = 1; i < 2*duration - 1; i++) {
 		ret = fgets(buffer, MAXSTRLEN, fp);
-		process(ret, 1);
+		ret = strtok(buffer, ",");
+		process();
 	}
 
 	// Last iteration
 	ret = fgets(buffer, MAXSTRLEN, fp);
 	token = strtok(buffer, ",");
 	strcpy(csv_end_time, token);
-	process(token, 0);
+	process();
 }
 
 // Allocate nodes for all incoming packets
@@ -188,17 +161,14 @@ void clean_heap() {
 // Usage message
 static void usage(const char *prgname) {
 	printf("%s [EAL options] -- \n"
-		"  -d DISTRIBUTION: <uniform|exponential>\n"
 		"  -f FLOWS: number of flows\n"
 		"  -s SIZE: frame size in bytes\n"
 		"  -t TIME: time in seconds to send packets\n"
 		"  -e SEED: seed\n"
-		"  -D DISTRIBUTION: <uniform|exponential|bimodal> on the server\n"
-		"  -i INSTRUCTIONS: number of instructions on the server\n"
-		"  -j INSTRUCTIONS: number of instructions on the server\n"
-		"  -m MODE: mode for Bimodal distribution\n"
+		"  -i OFFSET: offset of the CSV file\n"
 		"  -c FILENAME: name of the configuration file\n"
-		"  -o FILENAME: name of the output file\n",
+		"  -o FILENAME: name of the output file\n"
+		"  -C FILENAME: name of the CSV file\n",
 		prgname
 	);
 }
@@ -210,54 +180,13 @@ int app_parse_args(int argc, char **argv) {
 	char *prgname = argv[0];
 
 	argvopt = argv;
-	while ((opt = getopt(argc, argvopt, "d:r:f:s:p:t:c:C:o:e:D:i:j:m:")) != EOF) {
+	while ((opt = getopt(argc, argvopt, "f:s:t:c:C:o:e:i:")) != EOF) {
 		switch (opt) {
-		// distribution on the client
-		case 'd':
-			if(strcmp(optarg, "uniform") == 0) {
-				// Uniform distribution
-				distribution = UNIFORM_VALUE;
-			} else if(strcmp(optarg, "exponential") == 0) {
-				// Exponential distribution
-				distribution = EXPONENTIAL_VALUE;
-			} else {
-				usage(prgname);
-				rte_exit(EXIT_FAILURE, "Invalid arguments.\n");
-			}
-			break;
-
-		// distribution on the server
-		case 'D':
-			if(strcmp(optarg, "constant") == 0) {
-				// Constant
-				srv_distribution = CONSTANT_VALUE;
-			} else if(strcmp(optarg, "exponential") == 0) {
-				// Exponential distribution
-				srv_distribution = EXPONENTIAL_VALUE;
-			} else if(strcmp(optarg, "bimodal") == 0) {
-				// Bimodal distribution
-				srv_distribution = BIMODAL_VALUE;
-			} else {
-				usage(prgname);
-				rte_exit(EXIT_FAILURE, "Invalid arguments.\n");
-			}
-			break;
-			
-		// iterations on the server
+		// offset of the CSV file
 		case 'i':
-			srv_iterations0 = process_int_arg(optarg);
+			csv_offset = process_int_arg(optarg);
 			break;
 		
-		// iterations on the server
-		case 'j':
-			srv_iterations1 = process_int_arg(optarg);
-			break;
-
-		// mode on the server
-		case 'm':
-			srv_mode = process_double_arg(optarg);
-			break;
-
 		// flows
 		case 'f':
 			nr_flows = process_int_arg(optarg);
@@ -347,7 +276,8 @@ void print_stats_output() {
 		return;
 	}
 
-	printf("\nincoming_idx = %d -- never_sent = %ld\n", incoming_idx, total_never_sent);
+	printf("\nStart/End -- %s -- %s\n", csv_start_time, csv_end_time);
+	printf("incoming_idx = %d -- never_sent = %ld\n", incoming_idx, total_never_sent);
 	uint64_t j = nr_packets/2;
 
 	// print the RTT latency in (ns)
@@ -411,8 +341,8 @@ void process_config_file(char *cfg_file) {
 }
 
 // Fill the data into packet payload properly
-inline void fill_payload_pkt(struct rte_mbuf *pkt, uint32_t idx, uint64_t value) {
+inline void fill_payload_pkt(struct rte_mbuf *pkt, uint32_t i, uint64_t value) {
 	uint8_t *payload = (uint8_t*) rte_pktmbuf_mtod_offset(pkt, uint8_t*, PAYLOAD_OFFSET);
 
-	((uint64_t*) payload)[idx] = value;
+	((uint64_t*) payload)[i] = value;
 }

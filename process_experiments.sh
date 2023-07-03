@@ -4,8 +4,9 @@ PERCENTILE_1="50.0"
 PERCENTILE_2="99.9"
 
 SERVER_LAYOUT_LIST=("l1" "l2" "l3" "l4")
-CLIENT_RATE_INITIAL=50000
-CLIENT_RATE_INCREMENTAL=50000
+CLIENT_OFFSET_RANGE=3
+CLIENT_OFFSET_VALUES=(0 750 1285 6620)
+CLIENT_OFFSET_NAMES=("low" "medium" "high" "super_high")
 
 error () {
     local Z=1.96
@@ -17,26 +18,23 @@ error () {
 }
 
 for l in ${SERVER_LAYOUT_LIST[@]}; do
-    CLIENT_CURRENT_RATE=$(( CLIENT_RATE_INITIAL + CLIENT_RATE_INCREMENTAL ))
-    DIR="results/$l/${CLIENT_CURRENT_RATE}"
-
     OUTPUT_FILE="results/$l.dat"
     rm -rf $OUTPUT_FILE 1>/dev/null 2>/dev/null
 
-    while [ -d $DIR ]; do
+    for i in `seq 0 ${CLIENT_OFFSET_RANGE}`; do
+	NAME=${CLIENT_OFFSET_NAMES[i]}
+	VALUE=${CLIENT_OFFSET_VALUES[i]}
+	DIR="results/$l/${NAME}"
         FILE1="$DIR/percentiles_${PERCENTILE_1}.txt"
         FILE2="$DIR/percentiles_${PERCENTILE_2}.txt"
 
         if [ ! -f $FILE1 ]; then
-            break;
+            continue
         fi
 
         error $FILE1
-        echo -ne "$CLIENT_CURRENT_RATE\t$MEAN\t$ERROR\t" >> $OUTPUT_FILE
+        echo -ne "$NAME\t$MEAN\t$ERROR\t" >> $OUTPUT_FILE
         error $FILE2
         echo -ne "$MEAN\t$ERROR\n" >> $OUTPUT_FILE
-
-	CLIENT_CURRENT_RATE=$(( CLIENT_CURRENT_RATE + CLIENT_RATE_INCREMENTAL  ))
-    DIR="results/$l/${CLIENT_CURRENT_RATE}"
     done
 done
