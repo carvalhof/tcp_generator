@@ -206,7 +206,7 @@ int app_parse_args(int argc, char **argv) {
 	char *prgname = argv[0];
 
 	argvopt = argv;
-	while ((opt = getopt(argc, argvopt, "f:s:t:c:C:o:e:i:")) != EOF) {
+	while ((opt = getopt(argc, argvopt, "a:f:s:t:c:C:o:e:i:")) != EOF) {
 		switch (opt) {
 		// offset of the CSV file
 		case 'i':
