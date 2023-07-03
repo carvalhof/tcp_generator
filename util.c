@@ -33,6 +33,32 @@ uint64_t get_instructions_for_the_server(uint32_t *arr, uint32_t randomness) {
 	return service_time / srv_time_in_ns_per_instruction;
 }
 
+uint64_t get_nr_packets(FILE *fp, uint32_t offset) {
+	char buffer[MAXSTRLEN];
+
+	// Skipping the first line
+	char* ret __attribute__((unused)) = fgets(buffer, MAXSTRLEN, fp);
+
+	// Skipping until reach to the 'offset' line
+	for(uint32_t i = 0; i < offset; i++) {
+		ret = fgets(buffer, MAXSTRLEN, fp);
+	}
+
+	// Couting the number of packets considering the duration
+	uint64_t n = 0;
+	for(uint32_t i = 0; i < 2*duration; i++) {
+		ret = fgets(buffer, MAXSTRLEN, fp);
+		char *token = strtok(buffer, ",");
+		for(uint32_t j = 0; j < 12; j++) {
+			token = strtok(NULL, ",");
+		}
+		token = strtok(NULL, ",");
+		n += atoi(token);
+	}
+
+	return n;
+}
+
 inline void process() {
 	char *ret __attribute__((unused));
 	ret = strtok(NULL, ",");
