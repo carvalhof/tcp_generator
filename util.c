@@ -357,19 +357,19 @@ void process_config_file(char *cfg_file) {
 	entry = (char*) rte_cfgfile_get_entry(file, "application", "sqrt");
 	if(entry) {
 		uint64_t duration;
-		sscanf(entry, "%lu", &duration)
+		sscanf(entry, "%lu", &duration);
 		sqrt_time_one_iteration = duration;
 	}
 	entry = (char*) rte_cfgfile_get_entry(file, "application", "stridedmem");
 	if(entry) {
 		uint64_t duration;
-		sscanf(entry, "%lu", &duration)
+		sscanf(entry, "%lu", &duration);
 		stridedmem_time_one_iteration = duration;
 	}
 	entry = (char*) rte_cfgfile_get_entry(file, "application", "null");
 	if(entry) {
 		uint64_t duration;
-		sscanf(entry, "%lu", &duration)
+		sscanf(entry, "%lu", &duration);
 		null_time_one_iteration = duration;
 	}
 
