@@ -51,7 +51,8 @@ typedef struct timestamp_node_t {
 } node_t;
 
 typedef struct application_node_t {
-	uint64_t service_time_in_us;
+	uint64_t instructions;
+	uint64_t randomness;
 } application_node_t;
 
 extern uint32_t seed;
