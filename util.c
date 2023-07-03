@@ -16,31 +16,21 @@ static uint32_t process_int_arg(const char *arg) {
 	return strtoul(arg, &end, 10);
 }
 
-uint64_t get_nr_packets(FILE *fp, uint32_t offset) {
-	char buffer[MAXSTRLEN];
+uint64_t get_instructions_for_the_server(uint32_t *arr, uint32_t randomness) {
+	double p = ((double)randomness / RAND_MAX) * PERCENTILES;
 
-	// Skipping the first line
-	char* ret __attribute__((unused)) = fgets(buffer, MAXSTRLEN, fp);
+	uint32_t i = (uint32_t) p;
+	double r = p - i;
+	
+	if(i == PERCENTILES)
+		return arr[PERCENTILES-1];
 
-	// Skipping until reach to the 'offset' line
-	for(uint32_t i = 0; i < offset; i++) {
-		ret = fgets(buffer, MAXSTRLEN, fp);
-	}
+	uint32_t lb = arr[i];
+	uint32_t ub = arr[i+1];
 
-	// Couting the number of packets considering the duration
-	uint64_t n = 0;
-	for(uint32_t i = 0; i < 2*duration; i++) {
-		ret = fgets(buffer, MAXSTRLEN, fp);
-		char *token = strtok(buffer, ",");
-		for(uint32_t j = 0; j < 12; j++) {
-			token = strtok(NULL, ",");
-		}
-		token = strtok(NULL, ",");
-		int x = atoi(token);
-		n += x;
-	}
+	uint32_t service_time = r * (ub - lb);
 
-	return n;
+	return service_time / srv_time_in_ns_per_instruction;
 }
 
 inline void process() {
@@ -62,8 +52,9 @@ inline void process() {
 	// Distributed the packets uniformly within 1-sec window
 	// Distributed the service time uniformly
 	for(uint32_t i = 0; i < queries; i++) {
-		uint32_t j = rand() % PERCENTILES;
-		application_array[idx].service_time_in_us = arr[j];
+		uint32_t j = rand();
+		application_array[idx].instructions = get_instructions_for_the_server(arr, j);
+		application_array[idx].randomness = j;
 		interarrival_array[idx] = mean * TICKS_PER_US;
 		idx++;
 	}
@@ -76,6 +67,14 @@ void process_csv_file() {
 	if(!fp) {
 		fprintf(stderr, "Error: %s\n", strerror(errno));
 		exit(EXIT_FAILURE);
+	}
+
+	if(srv_application == SQRT_APPLICATION_VALUE) {
+		srv_time_in_ns_per_instruction = sqrt_time_one_iteration;
+	} else if(srv_application == STRIDEDMEM_APPLICATION_VALUE) {
+		srv_time_in_ns_per_instruction = stridedmem_time_one_iteration;
+	} else if(srv_application == NULL_APPLICATION_VALUE) {
+		srv_time_in_ns_per_instruction = null_time_one_iteration;
 	}
 
 	idx = 0;
@@ -165,6 +164,7 @@ static void usage(const char *prgname) {
 		"  -s SIZE: frame size in bytes\n"
 		"  -t TIME: time in seconds to send packets\n"
 		"  -e SEED: seed\n"
+		"  -a APPLICATION: <sqrt|stridedmem|null> on the server\n"
 		"  -i OFFSET: offset of the CSV file\n"
 		"  -c FILENAME: name of the configuration file\n"
 		"  -o FILENAME: name of the output file\n"
@@ -209,6 +209,23 @@ int app_parse_args(int argc, char **argv) {
 		// seed
 		case 'e':
 			seed = process_int_arg(optarg);
+			break;
+
+		// server's application
+		case 'a':
+			if(strcmp(optarg, "sqrt") == 0) {
+				// Square root
+				srv_application = SQRT_APPLICATION_VALUE;
+			} else if(strcmp(optarg, "stridedmem") == 0) {
+				// Stridedmem
+				srv_application = STRIDEDMEM_APPLICATION_VALUE;
+			} else if(strcmp(optarg, "null") == 0) {
+				// Null (busy waiting)
+				srv_application = NULL_APPLICATION_VALUE;
+			} else {
+				usage(prgname);
+				rte_exit(EXIT_FAILURE, "Invalid arguments.\n");
+			}
 			break;
 
 		// config file name
@@ -334,6 +351,26 @@ void process_config_file(char *cfg_file) {
 		uint16_t port;
 		sscanf(entry, "%hu", &port);
 		dst_tcp_port = port;
+	}
+
+	// load server calibration
+	entry = (char*) rte_cfgfile_get_entry(file, "application", "sqrt");
+	if(entry) {
+		uint64_t duration;
+		sscanf(entry, "%lu", &duration)
+		sqrt_time_one_iteration = duration;
+	}
+	entry = (char*) rte_cfgfile_get_entry(file, "application", "stridedmem");
+	if(entry) {
+		uint64_t duration;
+		sscanf(entry, "%lu", &duration)
+		stridedmem_time_one_iteration = duration;
+	}
+	entry = (char*) rte_cfgfile_get_entry(file, "application", "null");
+	if(entry) {
+		uint64_t duration;
+		sscanf(entry, "%lu", &duration)
+		null_time_one_iteration = duration;
 	}
 
 	// close the file

@@ -31,8 +31,11 @@
 #define EXPONENTIAL_VALUE			2
 #define BIMODAL_VALUE				3
 #define IPV4_ADDR(a, b, c, d)		(((d & 0xff) << 24) | ((c & 0xff) << 16) | ((b & 0xff) << 8) | (a & 0xff))
-
 #define PAYLOAD_OFFSET				14+20+20
+
+#define SQRT_APPLICATION_VALUE			0
+#define STRIDEDMEM_APPLICATION_VALUE	1
+#define NULL_APPLICATION_VALUE			2
 
 typedef struct lcore_parameters {
 	uint8_t qid;
@@ -62,6 +65,9 @@ extern uint32_t tcp_payload_size;
 
 uint64_t idx;
 uint64_t csv_offset;
+uint64_t srv_application;
+uint64_t sqrt_time_one_iteration;
+uint64_t stridedmem_time_one_iteration;
 char csv_filename[MAXSTRLEN];
 char csv_start_time[MAXSTRLEN];
 char csv_end_time[MAXSTRLEN];
