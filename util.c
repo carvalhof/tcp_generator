@@ -72,7 +72,7 @@ inline void process() {
 
 	// Get the number of packets 
 	ret = strtok(NULL, ","); // Skip the QPS
-	uint32_t queries = atoi(ret);
+	uint32_t queries = 1;//atoi(ret);
 	double mean = (1.0/queries) * 1000000.0;
 
 	// Distributed the packets uniformly within 1-sec window
