@@ -289,7 +289,7 @@ static int lcore_tx(void *arg) {
 		fill_payload_pkt(pkt, 0, next_tsc);
 		fill_payload_pkt(pkt, 2, (uint64_t) flow_id);
 		fill_payload_pkt(pkt, 4, app_array[i].instructions);
-		fill_payload_pkt(pkt, 4, app_array[i].randomness);
+		fill_payload_pkt(pkt, 5, app_array[i].randomness);
 
 		// sleep for while
 		while (rte_rdtsc() < next_tsc) { }

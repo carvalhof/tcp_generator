@@ -17,19 +17,14 @@ static uint32_t process_int_arg(const char *arg) {
 }
 
 uint64_t get_instructions_for_the_server(uint32_t *arr, uint32_t randomness) {
-	double p = ((double)randomness / RAND_MAX) * PERCENTILES;
-
-	uint32_t i = (uint32_t) p;
-	double r = p - i;
-	
-	if(i == PERCENTILES)
-		return arr[PERCENTILES-1];
+	uint32_t i = randomness % (PERCENTILES-1);
+	double r = (double)randomness / RAND_MAX;
 
 	uint32_t lb = arr[i];
 	uint32_t ub = arr[i+1];
 
-	uint32_t service_time = r * (ub - lb);
-
+	uint32_t service_time = (lb + (r * (ub - lb)));
+	
 	return service_time / srv_time_in_ns_per_instruction;
 }
 
@@ -49,7 +44,7 @@ uint64_t get_nr_packets(FILE *fp, uint32_t offset) {
 	for(uint32_t i = 0; i < 2*duration; i++) {
 		ret = fgets(buffer, MAXSTRLEN, fp);
 		char *token = strtok(buffer, ",");
-		for(uint32_t j = 0; j < 12; j++) {
+		for(uint32_t j = 0; j < (PERCENTILES+1); j++) {
 			token = strtok(NULL, ",");
 		}
 		token = strtok(NULL, ",");
@@ -66,20 +61,20 @@ inline void process() {
 	// Get the percentiles, choose one, and update the application_array
 	uint32_t arr[PERCENTILES];
 	for(uint32_t i = 0; i < PERCENTILES; i++) {
-		ret = strtok(NULL, ",");
 		arr[i] = atoi(ret);
+		ret = strtok(NULL, ",");
 	}
-
+	
 	// Get the number of packets 
 	ret = strtok(NULL, ","); // Skip the QPS
-	uint32_t queries = 1;//atoi(ret);
+	uint32_t queries = atoi(ret);
 	double mean = (1.0/queries) * 1000000.0;
 
 	// Distributed the packets uniformly within 1-sec window
 	// Distributed the service time uniformly
 	for(uint32_t i = 0; i < queries; i++) {
 		uint32_t j = rand();
-		application_array[idx].instructions = 0;//get_instructions_for_the_server(arr, j);
+		application_array[idx].instructions = get_instructions_for_the_server(arr, j);
 		application_array[idx].randomness = j;
 		interarrival_array[idx] = mean * TICKS_PER_US;
 		idx++;
@@ -382,20 +377,20 @@ void process_config_file(char *cfg_file) {
 	// load server calibration
 	entry = (char*) rte_cfgfile_get_entry(file, "application", "sqrt");
 	if(entry) {
-		uint64_t duration;
-		sscanf(entry, "%lu", &duration);
+		double duration;
+		sscanf(entry, "%lf", &duration);
 		sqrt_time_one_iteration = duration;
 	}
 	entry = (char*) rte_cfgfile_get_entry(file, "application", "stridedmem");
 	if(entry) {
-		uint64_t duration;
-		sscanf(entry, "%lu", &duration);
+		double duration;
+		sscanf(entry, "%lf", &duration);
 		stridedmem_time_one_iteration = duration;
 	}
 	entry = (char*) rte_cfgfile_get_entry(file, "application", "null");
 	if(entry) {
-		uint64_t duration;
-		sscanf(entry, "%lu", &duration);
+		double duration;
+		sscanf(entry, "%lf", &duration);
 		null_time_one_iteration = duration;
 	}
 
