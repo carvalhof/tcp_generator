@@ -3,11 +3,14 @@
 PERCENTILE_1="50.0"
 PERCENTILE_2="99.9"
 
+SERVER_LAYOUT_RANGE=3
 SERVER_LAYOUT_LIST=("l1" "l2" "l3" "l4")
 CLIENT_OFFSET_RANGE=2
 CLIENT_OFFSET_VALUES=(0 750 1285 6620)
 CLIENT_OFFSET_NAMES=("low" "medium" "high" "super_high")
 
+LAYOUT_NAMES=("Layout 1" "Layout 2" "Layout 3" "Layout 4")
+LAYOUT_DESCRIPTIONS=("cFCFS + Same Core" "dFCFS + Same Core" "cFCFS + Dif. Cores" "dFCFS + Dif. Cores")
 error () {
     local Z=1.96
     local N=`wc -l $1 | cut -d' ' -f1`
@@ -17,13 +20,14 @@ error () {
     ERROR=`awk 'BEGIN {printf "%f", '$Z' * '$STDEV'/sqrt('$N')}'`
 }
 
-for l in ${SERVER_LAYOUT_LIST[@]}; do
-    OUTPUT_FILE="results/$l.dat"
-    rm -rf $OUTPUT_FILE 1>/dev/null 2>/dev/null
-
-    for i in `seq 0 ${CLIENT_OFFSET_RANGE}`; do
-	NAME=${CLIENT_OFFSET_NAMES[i]}
-	VALUE=${CLIENT_OFFSET_VALUES[i]}
+OUTPUT_FILE="results.dat"
+rm -rf $OUTPUT_FILE 1>/dev/null 2>/dev/null
+for i in `seq 0 ${SERVER_LAYOUT_RANGE}`; do
+    l=${SERVER_LAYOUT_LIST[i]}
+    echo -ne "${LAYOUT_NAMES[i]} (${LAYOUT_DESCRIPTIONS[i]})\n" >> ${OUTPUT_FILE}
+    for j in `seq 0 ${CLIENT_OFFSET_RANGE}`; do
+	NAME=${CLIENT_OFFSET_NAMES[j]}
+	VALUE=${CLIENT_OFFSET_VALUES[j]}
 	DIR="results/$l/${NAME}"
         FILE1="$DIR/percentiles_${PERCENTILE_1}.txt"
         FILE2="$DIR/percentiles_${PERCENTILE_2}.txt"
@@ -31,10 +35,10 @@ for l in ${SERVER_LAYOUT_LIST[@]}; do
         if [ ! -f $FILE1 ]; then
             continue
         fi
-
         error $FILE1
-        echo -ne "$NAME\t$MEAN\t$ERROR\t" >> $OUTPUT_FILE
+        echo -ne "\t$NAME\t$MEAN\t$ERROR\t" >> ${OUTPUT_FILE}
         error $FILE2
-        echo -ne "$MEAN\t$ERROR\n" >> $OUTPUT_FILE
+        echo -ne "$MEAN\t$ERROR\n" >> ${OUTPUT_FILE}
     done
+    echo -ne "#---------------------------------\n" >> ${OUTPUT_FILE}
 done
