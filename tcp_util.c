@@ -7,9 +7,9 @@ void init_tcp_blocks() {
 
 	// choose TCP source port for all flows
 	uint16_t src_tcp_port;
-	uint16_t ports[nr_flows];
+	uint16_t src_ports[nr_flows];
 	for(uint32_t i = 0; i < nr_flows; i++) {
-		ports[i] = rte_cpu_to_be_16((i % nr_flows) + 1);
+		src_ports[i] = rte_cpu_to_be_16((i % nr_flows) + 1);
 	}
 
 	for(uint32_t i = 0; i < nr_flows; i++) {
@@ -17,7 +17,7 @@ void init_tcp_blocks() {
 		rte_atomic16_set(&tcp_control_blocks[i].tcb_state, TCP_INIT);
 		rte_atomic16_set(&tcp_control_blocks[i].tcb_rwin, 0xFFFF);
 
-		src_tcp_port = ports[i];
+		src_tcp_port = src_ports[i];
 
 		tcp_control_blocks[i].src_addr = src_ipv4_addr;
 		tcp_control_blocks[i].dst_addr = dst_ipv4_addr;
@@ -241,4 +241,15 @@ void fill_tcp_packet(tcp_control_block_t *block, struct rte_mbuf *pkt) {
 	// fill the packet size
 	pkt->data_len = frame_size;
 	pkt->pkt_len = pkt->data_len;
+}
+
+void hot_fill_tcp_packet(tcp_control_block_t *block, struct rte_mbuf *pkt) {
+	// get IPv4 information
+	struct rte_ipv4_hdr *ipv4_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_ipv4_hdr *, sizeof(struct rte_ether_hdr));
+
+	// fill TCP information
+	struct rte_tcp_hdr *tcp_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_tcp_hdr *, sizeof(struct rte_ether_hdr) + (ipv4_hdr->version_ihl & 0x0f)*4);
+
+	// fill TCP ACK information
+	tcp_hdr->recv_ack = rte_atomic32_read(&block->tcb_next_ack);
 }

@@ -196,7 +196,7 @@ void insert_flow(uint16_t portid, uint32_t i) {
 	struct rte_flow_action action[MAX_RTE_FLOW_ACTIONS] = {};
 
 	attr.egress = 0;
-    attr.ingress = 1;
+	attr.ingress = 1;
 
 	action[act_idx].type= RTE_FLOW_ACTION_TYPE_QUEUE;
 	action[act_idx].conf = &tcp_control_blocks[i].flow_queue_action;

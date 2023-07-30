@@ -69,7 +69,7 @@ typedef struct tcp_control_block_s {
 
 #define ETH_IPV4_TYPE_NETWORK		0x0008
 #define HANDSHAKE_TIMEOUT_IN_US		100000
-#define HANDSHAKE_RETRANSMISSION	10
+#define HANDSHAKE_RETRANSMISSION	4
 #define SEQ_LEQ(a,b)		        ((int32_t)((a)-(b)) <= 0)
 #define SEQ_LT(a,b)		        	((int32_t)((a)-(b)) < 0)
 
@@ -93,8 +93,9 @@ extern tcp_control_block_t *tcp_control_blocks;
 void init_tcp_blocks();
 struct rte_mbuf* create_syn_packet(uint16_t i);
 struct rte_mbuf *create_ack_packet(uint16_t i);
-void fill_tcp_packet(tcp_control_block_t *block, struct rte_mbuf *pkt);
 void fill_tcp_payload(uint8_t *payload, uint32_t length);
 struct rte_mbuf* process_syn_ack_packet(struct rte_mbuf* pkt);
+void fill_tcp_packet(tcp_control_block_t *block, struct rte_mbuf *pkt);
+void hot_fill_tcp_packet(tcp_control_block_t *block, struct rte_mbuf *pkt);
 
 #endif // __TCP_UTIL_H__

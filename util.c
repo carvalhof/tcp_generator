@@ -76,6 +76,8 @@ void create_interarrival_array() {
 	uint64_t rate_per_queue = rate/nr_queues;
 	uint64_t nr_elements_per_queue = 2 * rate_per_queue * duration;
 
+	assert(rate_per_queue > 0);
+
 	interarrival_array = (uint32_t**) rte_malloc(NULL, nr_queues * sizeof(uint32_t*), 64);
 	if(interarrival_array == NULL) {
 		rte_exit(EXIT_FAILURE, "Cannot alloc the interarrival_gap array.\n");
@@ -142,8 +144,10 @@ void create_flow_indexes_array() {
 // Clean up all allocate structures
 void clean_heap() {
 	rte_free(incoming_array);
-	rte_free(flow_indexes_array);
-	rte_free(interarrival_array);
+	for(uint64_t q = 0; q < nr_queues; q++) {
+		rte_free(flow_indexes_array[q]);
+		rte_free(interarrival_array[q]);
+	}
 	rte_free(application_array);
 }
 
@@ -225,11 +229,13 @@ int app_parse_args(int argc, char **argv) {
 		// rate (pps)
 		case 'r':
 			rate = process_int_arg(optarg);
+			assert(rate > 0);
 			break;
 
 		// flows
 		case 'f':
 			nr_flows = process_int_arg(optarg);
+			assert(nr_flows > 0);
 			break;
 
 		// frame size (bytes)
@@ -244,11 +250,13 @@ int app_parse_args(int argc, char **argv) {
 		// duration (s)
 		case 't':
 			duration = process_int_arg(optarg);
+			assert(duration > 0);
 			break;
 		
 		// queues
 		case 'q':
 			nr_queues = process_int_arg(optarg);
+			assert(nr_queues > 0);
 			min_lcores = 1 + 2 + nr_queues;
 			break;
 

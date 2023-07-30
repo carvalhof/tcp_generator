@@ -88,9 +88,10 @@ int process_rx_pkt(struct rte_mbuf *pkt, node_t *incoming, uint32_t *incoming_id
 
 	// update ACK number in the TCP control block from the packet
 	uint32_t ack_cur = rte_be_to_cpu_32(rte_atomic32_read(&block->tcb_next_ack));
-	uint32_t ack_hdr = rte_be_to_cpu_32(tcp_hdr->sent_seq) + (packet_data_size);
+	uint32_t ack_hdr = seq + packet_data_size;
 	if(SEQ_LEQ(ack_cur, ack_hdr)) {
-		rte_atomic32_set(&block->tcb_next_ack, tcp_hdr->sent_seq + rte_cpu_to_be_32(packet_data_size));
+		uint32_t acked = rte_cpu_to_be_32(ack_hdr);
+		rte_atomic32_set(&block->tcb_next_ack, acked);
 	}
 
 	// obtain both timestamp from the packet
@@ -115,10 +116,17 @@ void start_client(uint16_t portid) {
 	uint16_t nb_rx;
 	uint16_t nb_tx;
 	uint64_t ts_syn;
-	uint32_t nb_retransmission;
 	struct rte_mbuf *pkt;
+	struct rte_flow_error err;
 	tcp_control_block_t *block;
+	uint32_t nb_retransmission;
 	struct rte_mbuf *pkts[BURST_SIZE];
+
+	// flush all flow rules
+	int ret = rte_flow_flush(portid, &err);
+	if(ret != 0) {
+		rte_exit(EXIT_FAILURE, "Cannot flush all rules associated with a port=%d\n", portid);
+	}
 
 	for(int i = 0; i < nr_flows; i++) {
 		// get the TCP control block for the flow
@@ -276,15 +284,11 @@ static int lcore_tx(void *arg) {
 		uint16_t flow_id = flow_indexes[i];
 		tcp_control_block_t *block = &tcp_control_blocks[flow_id];
 
-		// get the packet
+		// allocated the packet
 		pkt = rte_pktmbuf_alloc(pktmbuf_pool_tx);
-		fill_tcp_packet(block, pkt);
 
-		// check the receive window for this flow
-		uint16_t rx_wnd = rte_atomic16_read(&block->tcb_rwin);
-		while(unlikely(rx_wnd < tcp_payload_size)) { 
-			rx_wnd = rte_atomic16_read(&block->tcb_rwin);
-		}
+		// fill the packet fields
+		fill_tcp_packet(block, pkt);
 
 		// fill the timestamp, flow id, server iterations, and server randomness into the packet payload
 		fill_payload_pkt(pkt, 0, next_tsc);
@@ -292,8 +296,17 @@ static int lcore_tx(void *arg) {
 		fill_payload_pkt(pkt, 4, app_array[i].iterations);
 		fill_payload_pkt(pkt, 5, app_array[i].randomness);
 
+		// check the receive window for this flow
+		uint16_t rx_wnd = rte_atomic16_read(&block->tcb_rwin);
+		while(unlikely(rx_wnd < tcp_payload_size)) { 
+			rx_wnd = rte_atomic16_read(&block->tcb_rwin);
+		}
+
 		// sleep for while
 		while (rte_rdtsc() < next_tsc) { }
+
+		// fill the TCP ACK field
+		hot_fill_tcp_packet(block, pkt);
 
 		// send the packet
 		rte_eth_tx_burst(portid, qid, &pkt, 1);
