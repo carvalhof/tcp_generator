@@ -17,29 +17,26 @@ make
 > **Make sure that `LD_LIBRARY_PATH` is configured properly.**
 
 ```bash
-sudo ./build/tcp-generator -a 41:00.0 -n 4 -c 0xff -- -d $DISTRIBUTION -r $RATE -f $FLOWS -s $SIZE -t $DURATION -q $QUEUES -e $SEED -c $ADDR_FILE -o $OUTPUT_FILE -D $SRV_DISTRIBUTION -i $SRV_ITERATIONS1
+sudo ./build/tcp-generator -a 41:00.0 -n 4 -c 0xff -- -f $FLOWS -s $SIZE -t $DURATION -e $SEED -C $CSV_FILE -i $INDEX_OF_CSV -c $ADDR_FILE -o $OUTPUT_FILE
 ```
 
 > **Example**
 
 ```bash
-sudo ./build/tcp-generator -a 41:00.0 -n 4 -c 0xff -- -d exponential -r 100000 -f 1 -s 128 -t 10 -q 1 -e 37 -c addr.cfg -o output.dat -D uniform -i 0
+sudo ./build/tcp-generator -a 41:00.0 -n 4 -c 0xff -- -f 1 -s 128 -t 10 -e 37 -C csv.csv -i 0 -c addr.cfg -o output.dat
 ```
 
 ### Parameters
 
-- `$DISTRIBUTION` : interarrival distribution (_e.g.,_ uniform or exponential)
-- `$RATE` : packet rate in _pps_
 - `$FLOWS` : number of flows
 - `$SIZE` : packet size in _bytes_
 - `$DURATION` : duration of execution in _seconds_ (we double for warming up)
-- `$QUEUES` : number of RX/TX queues
 - `$SEED` : seed number
 - `$ADDR_FILE` : name of address file (_e.g.,_ 'addr.cfg')
+- `$CSV_FILE` : name of CSV file
+- `$INDEX_OF_CSV_FILE` : index of the CSV file
 - `$OUTPUT_FILE` : name of output file containg the latency for each packet
-- `$SRV_DISTRIBUTION` : fakework distribution in the server side
-- `$SRV_ITERATIONS1` : iterations of the fakework in the server side
-- `$SRV_ITERATIONS2` : iterations of the fakework in the server side
+- `$APPLICATION` : application (sqrt/stridedmem/null)
 
 
 ### _addresses file_ structure
@@ -55,4 +52,9 @@ dst = 192.168.1.1
 
 [tcp]
 dst = 12345
+
+[application]
+sqrt = 1.97
+stridedmem = 1.33
+null = 1
 ```
