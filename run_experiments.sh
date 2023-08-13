@@ -1,18 +1,20 @@
 #!/bin/bash
 
-RUNS=14
+RUNS=2
 PERCENTILE_1="50.0"
 PERCENTILE_2="99.9"
 
 SERVER_TIMEOUT=35
-SERVER_IP=130.127.134.63
-SERVER_LAYOUT_LIST=("l1" "l2" "l3" "l4")
+#SERVER_IP=130.127.134.63	##  For CloudLab
+SERVER_IP=10.90.0.21 		##  For Rangers
+SERVER_LAYOUT_LIST=("newl1" "newl2" "newl2+" "newl3" "newl4" "newl4+")
 SERVER_SEED_LIST=(1646203793 986508091 193720917 15335381 633882127 1093215650 772188468 711307909 645856549 1127581467 765061083 1050115427 4231379 1000215989 1382853168 1927405477 306097907 1344972625 2098183364 323989894)
 SERVER_APPLICATION="sqrt"
 SERVER_CORES="1,3,5,7,9,11,13,15,17,19,21,23,25,27,29"
 
 CLIENT_DURATION=10
-CLIENT_PCI_NIC="ca:00.0"
+CLIENT_PCI_NIC="ca:00.0" 	## For CloudLab
+CLIENT_PCI_NIC="3b:00.0" 	## For Rangers
 CLIENT_CORES="3,5,7,9"
 CLIENT_FLOWS=128
 CLIENT_SIZE=128
@@ -50,11 +52,13 @@ process() {
 
 echo 3 | sudo tee /proc/sys/vm/drop_caches 1>/dev/null 2>/dev/null
 
-#ssh ${SERVER_IP} "echo 0 | sudo tee /proc/sys/kernel/nmi_watchdog" 1>/dev/null 2>/dev/null
+ssh ${SERVER_IP} "echo 0 | sudo tee /proc/sys/kernel/nmi_watchdog" 1>/dev/null 2>/dev/null
 
 for l in ${SERVER_LAYOUT_LIST[@]}; do
 
-	if [ $l = "l4" ]; then
+	if [ $l = "newl4" ]; then
+		SERVER_NUMBER_OF_CORES="2 6"
+	elif [ $l = "newl4+" ]; then
 		SERVER_NUMBER_OF_CORES="2 6"
 	else
 		SERVER_NUMBER_OF_CORES="8"
@@ -102,5 +106,5 @@ for l in ${SERVER_LAYOUT_LIST[@]}; do
 done
 
 rm -rf .tmp 1>/dev/null 2>/dev/null
-#rm -rf ${CLIENT_OUTPUT_FILE} 1>/dev/null 2>/dev/null
-#ssh ${SERVER_IP} "echo 1 | sudo tee /proc/sys/kernel/nmi_watchdog" 1>/dev/null 2>/dev/null
+rm -rf ${CLIENT_OUTPUT_FILE} 1>/dev/null 2>/dev/null
+ssh ${SERVER_IP} "echo 1 | sudo tee /proc/sys/kernel/nmi_watchdog" 1>/dev/null 2>/dev/null
