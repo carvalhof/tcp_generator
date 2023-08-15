@@ -9,7 +9,7 @@ Follow these instructions to build the tcp generator using DPDK 22.11 and CloudL
 ```bash
 git clone https://github.com/carvalhof/tcp_generator
 cd tcp_generator
-make
+PKG_CONFIG_PATH=$HOME/lib/x86_64-linux-gnu/pkgconfig make
 ```
 
 ## Running
@@ -17,13 +17,13 @@ make
 > **Make sure that `LD_LIBRARY_PATH` is configured properly.**
 
 ```bash
-sudo ./build/tcp-generator -a 41:00.0 -n 4 -c 0xff -- -f $FLOWS -s $SIZE -t $DURATION -e $SEED -C $CSV_FILE -i $INDEX_OF_CSV -c $ADDR_FILE -o $OUTPUT_FILE
+sudo LD_LIBRARY_PATH=$HOME/lib/x86_64-linux-gnu ./build/tcp-generator -a 41:00.0 -n 4 -c 0xff -- -f $FLOWS -s $SIZE -t $DURATION -e $SEED -C $CSV_FILE -i $INDEX_OF_CSV -c $ADDR_FILE -o $OUTPUT_FILE -a $APPLICATION
 ```
 
 > **Example**
 
 ```bash
-sudo ./build/tcp-generator -a 41:00.0 -n 4 -c 0xff -- -f 1 -s 128 -t 10 -e 37 -C csv.csv -i 0 -c addr.cfg -o output.dat
+sudo LD_LIBRARY_PATH=$HOME/lib/x86_64-linux-gnu ./build/tcp-generator -a 41:00.0 -n 4 -c 0xff -- -f 1 -s 128 -t 10 -e 37 -C csv.csv -i 0 -c addr.cfg -o output.dat -a sqrt
 ```
 
 ### Parameters
