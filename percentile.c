@@ -28,10 +28,8 @@ int main(int argc, char **argv) {
     }
 
     int val;
-    int flow;
-    int worker;
     for(int i = 0; i < n; i++) {
-        ret = fscanf(fp, "%d\t%d\t%x\n", &val, &flow, &worker);
+        ret = fscanf(fp, "%d\n", &val);
         arr[i] = val;
     }
 
