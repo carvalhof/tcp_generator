@@ -186,7 +186,7 @@ void clean_heap() {
 // Usage message
 static void usage(const char *prgname) {
 	printf("%s [EAL options] -- \n"
-		"  -d DISTRIBUTION: <uniform|exponential>\n"
+		"  -d DISTRIBUTION: <uniform|exponential|lognormal|pareto>\n"
 		"  -r RATE: rate in pps\n"
 		"  -f FLOWS: number of flows\n"
 		"  -s SIZE: frame size in bytes\n"
