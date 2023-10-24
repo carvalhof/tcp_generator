@@ -4,9 +4,21 @@ int distribution;
 char output_file[MAXSTRLEN];
 
 // Sample the value using Exponential Distribution
-double sample(double lambda) {
-	double u = rte_drand();
+double sample_exponential(double lambda) {
+	double u = (double)rand() / RAND_MAX; // Uniform random number [0,1]
 	return -log(1 - u) / lambda;
+}
+
+// Sample the value using Log-Normal Distribution
+double sample_lognormal(double mu, double sigma) {
+    double z = (double)rand() / RAND_MAX; // Uniform random number [0,1]
+    return exp(mu + sigma * sqrt(-2.0 * log(1 - z)));
+}
+
+// Sample the value using Pareto Distribution
+double sample_pareto(double alpha, double xm) {
+    double u = (double)rand() / RAND_MAX; // Uniform random number [0,1]
+    return xm / pow(1 - u, 1.0 / alpha);
 }
 
 // Convert string type into int type
@@ -96,15 +108,35 @@ void create_interarrival_array() {
 		
 		uint32_t *interarrival_gap = interarrival_array[i];
 		if(distribution == UNIFORM_VALUE) {
+			// Uniform
 			double mean = (1.0/rate_per_queue) * 1000000.0;
 			for(uint64_t j = 0; j < nr_elements_per_queue; j++) {
 				interarrival_gap[j] = mean * TICKS_PER_US;
 			}
-		} else {
+		} else if(distribution == EXPONENTIAL_VALUE) {
+			// Exponential
 			double lambda = 1.0/(1000000.0/rate_per_queue);
 			for(uint64_t j = 0; j < nr_elements_per_queue; j++) {
-				interarrival_gap[j] = sample(lambda) * TICKS_PER_US;
+				interarrival_gap[j] = sample_exponential(lambda) * TICKS_PER_US;
 			}
+		} else if(distribution == LOGNORMAL_VALUE) {
+			// Log-normal
+			double sigma = 2;
+			double mean = (1.0/rate_per_queue) * 1000000.0;
+			double u = log(mean) - (sigma*sigma)/2;
+			for(uint64_t j = 0; j < nr_elements_per_queue; j++) {
+				interarrival_gap[j] = sample_lognormal(u, sigma) * TICKS_PER_US;
+			}
+		} else if(distribution == PARETO_VALUE) {
+			// Pareto
+			double alpha = 2;
+			double mean = (1.0/rate_per_queue) * 1000000.0;
+			double xm = mean * (alpha - 1) / (alpha);
+			for(uint64_t j = 0; j < nr_elements_per_queue; j++) {
+				interarrival_gap[j] = sample_pareto(alpha, xm) * TICKS_PER_US;
+			}
+		} else {
+			exit(-1);
 		}
 	} 
 }
