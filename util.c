@@ -220,6 +220,12 @@ int app_parse_args(int argc, char **argv) {
 			} else if(strcmp(optarg, "exponential") == 0) {
 				// Exponential distribution
 				distribution = EXPONENTIAL_VALUE;
+			} else if(strcmp(optarg, "lognormal") == 0) {
+				// Lognormal distribution
+				distribution = LOGNORMAL_VALUE;
+			} else if(strcmp(optarg, "pareto") == 0) {
+				// Pareto distribution
+				distribution = PARETO_VALUE;
 			} else {
 				usage(prgname);
 				rte_exit(EXIT_FAILURE, "Invalid arguments.\n");
