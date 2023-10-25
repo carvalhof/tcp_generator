@@ -11,8 +11,12 @@ double sample_exponential(double lambda) {
 
 // Sample the value using Log-Normal Distribution
 double sample_lognormal(double mu, double sigma) {
-    double z = (double)rand() / RAND_MAX; // Uniform random number [0,1]
-    return exp(mu + sigma * sqrt(-2.0 * log(1 - z)));
+    double u1 = ((double)rand() / RAND_MAX); // Uniform random number [0,1]
+    double u2 = ((double)rand() / RAND_MAX); // Uniform random number [0,1]
+
+    double z = sqrt(-2.0 * log(u1)) * cos(2 * M_PI * u2);
+
+    return exp(mu + sigma * z);
 }
 
 // Sample the value using Pareto Distribution
