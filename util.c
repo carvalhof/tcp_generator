@@ -125,16 +125,16 @@ void create_interarrival_array() {
 			}
 		} else if(distribution == LOGNORMAL_VALUE) {
 			// Log-normal
-			double sigma = 2;
 			double mean = (1.0/rate_per_queue) * 1000000.0;
+			double sigma = sqrt(2*(log(mean) - log(mean/2)));
 			double u = log(mean) - (sigma*sigma)/2;
 			for(uint64_t j = 0; j < nr_elements_per_queue; j++) {
 				interarrival_gap[j] = sample_lognormal(u, sigma) * TICKS_PER_US;
 			}
 		} else if(distribution == PARETO_VALUE) {
 			// Pareto
-			double alpha = 2;
 			double mean = (1.0/rate_per_queue) * 1000000.0;
+			double alpha = 1.0 + mean / (mean - 1.0);
 			double xm = mean * (alpha - 1) / (alpha);
 			for(uint64_t j = 0; j < nr_elements_per_queue; j++) {
 				interarrival_gap[j] = sample_pareto(alpha, xm) * TICKS_PER_US;
