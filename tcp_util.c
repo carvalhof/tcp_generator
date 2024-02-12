@@ -1,19 +1,5 @@
 #include "tcp_util.h"
 
-// Shuffle the TCP source port array
-void shuffle(uint16_t* arr, uint32_t n) {
-	if(n < 2) {
-		return;
-	}
-
-	for(uint32_t i = 0; i < n - 1; i++) {
-		uint32_t j = i + rte_rand() / (UINT64_MAX / (n - i) + 1);
-		uint16_t tmp = arr[j];
-		arr[j] = arr[i];
-		arr[i] = tmp;
-	}
-}
-
 // Create and initialize the TCP Control Blocks for all flows
 void init_tcp_blocks() {
 	// allocate the all control block structure previosly
@@ -21,32 +7,30 @@ void init_tcp_blocks() {
 
 	// choose TCP source port for all flows
 	uint16_t src_tcp_port;
-	uint16_t ports[nr_flows];
+	uint16_t src_ports[nr_flows];
 	for(uint32_t i = 0; i < nr_flows; i++) {
-		ports[i] = rte_cpu_to_be_16((i % (nr_flows/nr_servers)) + 1);
+		src_ports[i] = rte_cpu_to_be_16((i % nr_flows) + 1);
 	}
-	// shuffle port array
-	shuffle(ports, nr_flows);
 
 	for(uint32_t i = 0; i < nr_flows; i++) {
 		rte_atomic16_init(&tcp_control_blocks[i].tcb_state);
 		rte_atomic16_set(&tcp_control_blocks[i].tcb_state, TCP_INIT);
 		rte_atomic16_set(&tcp_control_blocks[i].tcb_rwin, 0xFFFF);
 
-		src_tcp_port = ports[i];
+		src_tcp_port = src_ports[i];
 
 		tcp_control_blocks[i].src_addr = src_ipv4_addr;
 		tcp_control_blocks[i].dst_addr = dst_ipv4_addr;
 
 		tcp_control_blocks[i].src_port = src_tcp_port;
-		tcp_control_blocks[i].dst_port = rte_cpu_to_be_16(dst_tcp_port + (i % nr_servers));
+		tcp_control_blocks[i].dst_port = rte_cpu_to_be_16(dst_tcp_port);
 
-		uint32_t seq = rte_rand();
+		uint32_t seq = htonl(1);//rte_rand();
 		tcp_control_blocks[i].tcb_seq_ini = seq;
 		tcp_control_blocks[i].tcb_next_seq = seq;
 
 		tcp_control_blocks[i].flow_mark_action.id = i;
-		tcp_control_blocks[i].flow_queue_action.index = i % nr_queues;
+		tcp_control_blocks[i].flow_queue_action.index = 0;
 		tcp_control_blocks[i].flow_eth.type = ETH_IPV4_TYPE_NETWORK;
 		tcp_control_blocks[i].flow_eth_mask.type = 0xFFFF;
 		tcp_control_blocks[i].flow_ipv4.hdr.src_addr = tcp_control_blocks[i].dst_addr;
@@ -63,7 +47,7 @@ void init_tcp_blocks() {
 // Create the TCP SYN packet
 struct rte_mbuf* create_syn_packet(uint16_t i) {
 	// allocate TCP SYN packet in the hugepages
-	struct rte_mbuf* pkt = rte_pktmbuf_alloc(pktmbuf_pool);
+	struct rte_mbuf* pkt = rte_pktmbuf_alloc(pktmbuf_pool_tx);
 	if(pkt == NULL) {
 		rte_exit(EXIT_FAILURE, "Error to alloc a rte_mbuf.\n");
 	}
@@ -114,7 +98,7 @@ struct rte_mbuf* create_syn_packet(uint16_t i) {
 // Create the TCP ACK packet
 struct rte_mbuf *create_ack_packet(uint16_t i) {
 	// allocate TCP ACK packet in the hugepages
-	struct rte_mbuf* pkt = rte_pktmbuf_alloc(pktmbuf_pool);
+	struct rte_mbuf* pkt = rte_pktmbuf_alloc(pktmbuf_pool_tx);
 	if(pkt == NULL) {
 		rte_exit(EXIT_FAILURE, "Error to alloc a rte_mbuf.\n");
 	}
@@ -213,10 +197,7 @@ struct rte_mbuf* process_syn_ack_packet(struct rte_mbuf* pkt) {
 }
 
 // Fill the TCP packets from TCP Control Block data
-void fill_tcp_packet(uint16_t i, struct rte_mbuf *pkt) {
-	// get control block for the flow
-	tcp_control_block_t *block = &tcp_control_blocks[i];
-
+void fill_tcp_packet(tcp_control_block_t *block, struct rte_mbuf *pkt) {
 	// ensure that IP/TCP checksum offloadings
 	pkt->ol_flags |= (RTE_MBUF_F_TX_IPV4 | RTE_MBUF_F_TX_IP_CKSUM | RTE_MBUF_F_TX_TCP_CKSUM);
 
@@ -249,7 +230,7 @@ void fill_tcp_packet(uint16_t i, struct rte_mbuf *pkt) {
 	tcp_hdr->sent_seq = sent_seq;
 	tcp_hdr->recv_ack = rte_atomic32_read(&block->tcb_next_ack);
 	tcp_hdr->rx_win = 0xFFFF;
-	tcp_hdr->tcp_flags = RTE_TCP_ACK_FLAG;
+	tcp_hdr->tcp_flags = RTE_TCP_PSH_FLAG|RTE_TCP_ACK_FLAG;
 	tcp_hdr->tcp_urp = 0;
 	tcp_hdr->cksum = 0;
 
@@ -257,18 +238,18 @@ void fill_tcp_packet(uint16_t i, struct rte_mbuf *pkt) {
 	sent_seq = rte_cpu_to_be_32(rte_be_to_cpu_32(sent_seq) + tcp_payload_size);
 	block->tcb_next_seq = sent_seq;
 
-	// fill the payload of the packet
-	uint8_t *payload = ((uint8_t*)tcp_hdr) + sizeof(struct rte_tcp_hdr);
-	fill_tcp_payload(payload, tcp_payload_size);
-
 	// fill the packet size
 	pkt->data_len = frame_size;
 	pkt->pkt_len = pkt->data_len;
 }
 
-// Fill the payload of the TCP packet
-void fill_tcp_payload(uint8_t *payload, uint32_t length) {
-	for(uint32_t i = 0; i < length; i++) {
-		payload[i] = 'A';
-	}
+void hot_fill_tcp_packet(tcp_control_block_t *block, struct rte_mbuf *pkt) {
+	// get IPv4 information
+	struct rte_ipv4_hdr *ipv4_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_ipv4_hdr *, sizeof(struct rte_ether_hdr));
+
+	// fill TCP information
+	struct rte_tcp_hdr *tcp_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_tcp_hdr *, sizeof(struct rte_ether_hdr) + (ipv4_hdr->version_ihl & 0x0f)*4);
+
+	// fill TCP ACK information
+	tcp_hdr->recv_ack = rte_atomic32_read(&block->tcb_next_ack);
 }

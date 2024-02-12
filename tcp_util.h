@@ -1,6 +1,7 @@
 #ifndef __TCP_UTIL_H__
 #define __TCP_UTIL_H__
 
+#include <math.h>
 #include <stdint.h>
 
 #include <rte_ip.h>
@@ -40,6 +41,8 @@ typedef struct tcp_control_block_s {
 	uint32_t 						dst_addr;
 	uint16_t						src_port;
 	uint16_t						dst_port;
+	uint64_t						instructions;
+	double							randomness;
 
 	// used only by the RX
 	uint32_t						last_ack_recv;
@@ -65,8 +68,8 @@ typedef struct tcp_control_block_s {
 } __rte_cache_aligned tcp_control_block_t;
 
 #define ETH_IPV4_TYPE_NETWORK		0x0008
-#define HANDSHAKE_TIMEOUT_IN_US		500
-#define HANDSHAKE_RETRANSMISSION	6
+#define HANDSHAKE_TIMEOUT_IN_US		500000
+#define HANDSHAKE_RETRANSMISSION	4
 #define SEQ_LEQ(a,b)		        ((int32_t)((a)-(b)) <= 0)
 #define SEQ_LT(a,b)		        	((int32_t)((a)-(b)) < 0)
 
@@ -76,19 +79,23 @@ extern uint32_t src_ipv4_addr;
 extern struct rte_ether_addr dst_eth_addr;
 extern struct rte_ether_addr src_eth_addr;
 
+extern uint64_t srv_distribution;
+extern uint64_t srv_instructions;
+
 extern uint64_t nr_flows;
 extern uint64_t nr_queues;
-extern uint16_t nr_servers;
 extern uint32_t frame_size;
 extern uint32_t tcp_payload_size;
-extern struct rte_mempool *pktmbuf_pool;
+extern struct rte_mempool *pktmbuf_pool_rx;
+extern struct rte_mempool *pktmbuf_pool_tx;
 extern tcp_control_block_t *tcp_control_blocks;
 
 void init_tcp_blocks();
 struct rte_mbuf* create_syn_packet(uint16_t i);
 struct rte_mbuf *create_ack_packet(uint16_t i);
-void fill_tcp_packet(uint16_t i, struct rte_mbuf *pkt);
 void fill_tcp_payload(uint8_t *payload, uint32_t length);
 struct rte_mbuf* process_syn_ack_packet(struct rte_mbuf* pkt);
+void fill_tcp_packet(tcp_control_block_t *block, struct rte_mbuf *pkt);
+void hot_fill_tcp_packet(tcp_control_block_t *block, struct rte_mbuf *pkt);
 
 #endif // __TCP_UTIL_H__

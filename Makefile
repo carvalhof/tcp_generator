@@ -38,14 +38,17 @@ CFLAGS += -DALLOW_EXPERIMENTAL_API -Wall
 
 build/$(APP)-shared: $(SRCS-y) Makefile $(PC_FILE) | build
 	$(CC) $(CFLAGS) $(filter %.c,$^) -o $@ $(LDFLAGS) $(LDFLAGS_SHARED) -lm
+	$(CC) percentile.c -o percentile
 
 build/$(APP)-static: $(SRCS-y) Makefile $(PC_FILE) | build
 	$(CC) $(CFLAGS) $(filter %.c,$^) -o $@ $(LDFLAGS) $(LDFLAGS_SHARED) -lm
+	$(CC) percentile.c -o percentile
 
 build:
 	@mkdir -p $@
 
 .PHONY: clean
 clean:
+	rm percentile
 	rm -f build/$(APP) build/$(APP)-static build/$(APP)-shared
 	test -d build && rmdir -p build || true
