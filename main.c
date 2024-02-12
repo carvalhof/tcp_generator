@@ -97,14 +97,16 @@ int process_rx_pkt(struct rte_mbuf *pkt, node_t *incoming, uint32_t *incoming_id
 
 	// do not process retransmitted packets
 	uint32_t seq = rte_be_to_cpu_32(tcp_hdr->sent_seq);
-	if(SEQ_LT(block->last_seq_recv, seq)) {
+	if(likely(SEQ_LT(block->last_seq_recv, seq))) {
 		block->last_seq_recv = seq;
+	} else {
+		return 0;
 	}
 
 	// update ACK number in the TCP control block from the packet
 	uint32_t ack_cur = rte_be_to_cpu_32(rte_atomic32_read(&block->tcb_next_ack));
 	uint32_t ack_hdr = seq + packet_data_size;
-	if(SEQ_LEQ(ack_cur, ack_hdr)) {
+	if(likely(SEQ_LEQ(ack_cur, ack_hdr))) {
 		uint32_t acked = rte_cpu_to_be_32(ack_hdr);
 		rte_atomic32_set(&block->tcb_next_ack, acked);
 	}
