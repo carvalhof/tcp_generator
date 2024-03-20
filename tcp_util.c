@@ -67,7 +67,7 @@ struct rte_mbuf* create_syn_packet(uint16_t i) {
 	// fill IPv4 information
 	struct rte_ipv4_hdr *ipv4_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_ipv4_hdr *, sizeof(struct rte_ether_hdr));
 	ipv4_hdr->version_ihl = 0x45;
-	ipv4_hdr->total_length = rte_cpu_to_be_16(sizeof(struct rte_ipv4_hdr) + sizeof(struct rte_tcp_hdr));
+	ipv4_hdr->total_length = rte_cpu_to_be_16(sizeof(struct rte_ipv4_hdr) + sizeof(struct rte_tcp_hdr) + sizeof(tcp_options_ws_t) + sizeof(tcp_options_mss_t));
 	ipv4_hdr->time_to_live = 255;
 	ipv4_hdr->packet_id = 0;
 	ipv4_hdr->next_proto_id = IPPROTO_TCP;
@@ -80,7 +80,8 @@ struct rte_mbuf* create_syn_packet(uint16_t i) {
 	struct rte_tcp_hdr *tcp_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_tcp_hdr *, sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv4_hdr));
 	tcp_hdr->dst_port = block->dst_port;
 	tcp_hdr->src_port = block->src_port;
-	tcp_hdr->data_off = 0x50;
+	// tcp_hdr->data_off = 0x50;
+	tcp_hdr->data_off = 0x70;//((sizeof(struct rte_tcp_hdr) + sizeof(tcp_options_ws_t)) << 4);
 	tcp_hdr->sent_seq = block->tcb_seq_ini;
 	tcp_hdr->recv_ack = 0;
 	tcp_hdr->rx_win = 0xFFFF;
@@ -88,8 +89,21 @@ struct rte_mbuf* create_syn_packet(uint16_t i) {
 	tcp_hdr->tcp_urp = 0;
 	tcp_hdr->cksum = 0;
 
+	//tcp_options_ws_t *tcp_ws = (tcp_options_ws_t*)(((uint8_t*) tcp_hdr) + sizeof(struct rte_ether_hdr));
+	tcp_options_ws_t *tcp_ws = (tcp_options_ws_t*)(((uint8_t*) tcp_hdr) + 20);
+	tcp_ws->kind = 0x03;
+	tcp_ws->length = 0x03;
+	tcp_ws->shift = 0x0a;
+	tcp_ws->nop = 0x01;
+	
+	tcp_options_mss_t *tcp_mss = (tcp_options_mss_t*)(((uint8_t*) tcp_ws) + sizeof(tcp_options_ws_t));
+	tcp_mss->kind = 0x02;
+	tcp_mss->length = 0x04;
+	tcp_mss->value = htons(65535);
+
 	// fill the packet size
-	pkt->data_len = sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv4_hdr) + sizeof(struct rte_tcp_hdr);
+	// pkt->data_len = sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv4_hdr) + sizeof(struct rte_tcp_hdr);
+	pkt->data_len = sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv4_hdr) + sizeof(struct rte_tcp_hdr) + sizeof(tcp_options_ws_t) + sizeof(tcp_options_mss_t);
 	pkt->pkt_len = pkt->data_len;
 
 	return pkt;

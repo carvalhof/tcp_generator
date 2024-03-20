@@ -358,12 +358,6 @@ int cmp_func(const void * a, const void * b) {
 
 // Print stats into output file
 void print_stats_output() {
-	// open the file
-	FILE *fp = fopen(output_file, "w");
-	if(fp == NULL) {
-		rte_exit(EXIT_FAILURE, "Cannot open the output file.\n");
-	}
-
 	uint64_t total_never_sent = 0;
 	for(uint32_t i = 0; i < nr_queues; i++) {
 		total_never_sent += nr_never_sent[i];
@@ -371,12 +365,18 @@ void print_stats_output() {
 	
 	if((incoming_idx + total_never_sent) != 2 * rate * duration) {
 		printf("ERROR: received %d and %ld never sent\n", incoming_idx, total_never_sent);
-		fclose(fp);
 		return;
+	}
+	
+	// open the file
+	FILE *fp = fopen(output_file, "w");
+	if(fp == NULL) {
+		rte_exit(EXIT_FAILURE, "Cannot open the output file.\n");
 	}
 
 	printf("\nincoming_idx = %d -- never_sent = %ld\n", incoming_idx, total_never_sent);
-	uint64_t j = rate * duration - total_never_sent;
+	//uint64_t j = rate * duration - total_never_sent;
+	uint64_t j = (incoming_idx * 2)/10;
 
 	// print the RTT latency in (ns)
 	node_t *cur;
