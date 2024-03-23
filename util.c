@@ -247,6 +247,12 @@ int app_parse_args(int argc, char **argv) {
 			} else if(strcmp(optarg, "bimodal") == 0) {
 				// Bimodal distribution
 				srv_distribution = BIMODAL_VALUE;
+			} else if(strcmp(optarg, "bimodal1") == 0) {
+				// Bimodal distribution
+				srv_distribution = BIMODAL_VALUE;
+			} else if(strcmp(optarg, "bimodal2") == 0) {
+				// Bimodal distribution
+				srv_distribution = BIMODAL_VALUE;
 			} else {
 				usage(prgname);
 				rte_exit(EXIT_FAILURE, "Invalid arguments.\n");
@@ -375,8 +381,7 @@ void print_stats_output() {
 	}
 
 	printf("\nincoming_idx = %d -- never_sent = %ld\n", incoming_idx, total_never_sent);
-	//uint64_t j = rate * duration - total_never_sent;
-	uint64_t j = (incoming_idx * 2)/10;
+	uint64_t j = rate * duration - total_never_sent;
 
 	// print the RTT latency in (ns)
 	node_t *cur;

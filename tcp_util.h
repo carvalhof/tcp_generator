@@ -72,13 +72,13 @@ typedef struct tcp_options_ws_s {
 	uint8_t 	length;
 	uint8_t 	shift;
 	uint8_t 	nop;
-} __rte_cache_aligned tcp_options_ws_t;
+} tcp_options_ws_t;
 
 typedef struct tcp_options_mss_s {
 	uint8_t 	kind;
 	uint8_t 	length;
 	uint16_t 	value;
-} __rte_cache_aligned tcp_options_mss_t;
+} tcp_options_mss_t;
 
 #define ETH_IPV4_TYPE_NETWORK		0x0008
 #define HANDSHAKE_TIMEOUT_IN_US		500000
