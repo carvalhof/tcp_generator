@@ -1,7 +1,7 @@
 #!/bin/bash
 
 PERF=0
-RUNS=4
+RUNS=10
 PERCENTILE_1="50.0"
 PERCENTILE_2="99.9"
 
