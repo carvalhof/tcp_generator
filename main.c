@@ -84,7 +84,7 @@ int process_rx_pkt(struct rte_mbuf *pkt, node_t *incoming, uint32_t *incoming_id
 	// retrieve the index of the flow from the NIC (NIC tags the packet according the 5-tuple using DPDK rte_flow)
 	uint32_t flow_id = pkt->hash.fdir.hi;
 
-	// sanitify check
+	// sanity check
 	if(unlikely(flow_id != f_id)) {
 		return 0;
 	}
@@ -223,7 +223,7 @@ static int lcore_rx_ring(void *arg) {
 	}
 
 	// process all remaining packets that are in the RX ring (not from the NIC)
-	do{
+	do {
 		nb_rx = rte_ring_sc_dequeue_burst(rx_ring, (void**) pkts, BURST_SIZE, NULL);
 		for(int i = 0; i < nb_rx; i++) {
 			// process the incoming packet
