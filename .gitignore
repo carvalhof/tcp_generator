@@ -1,0 +1,5 @@
+build/
+randmem
+percentile
+process_ccdf.sh
+*.dat
