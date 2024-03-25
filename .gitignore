@@ -1,0 +1,5 @@
+build/
+sqrt/
+percentile
+process_ccdf.sh
+*.dat
