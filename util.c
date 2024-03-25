@@ -1,6 +1,10 @@
 #include "util.h"
 
+double srv_mode;
 int distribution;
+uint64_t srv_iterations0;
+uint64_t srv_iterations1;
+uint64_t srv_distribution;
 char output_file[MAXSTRLEN];
 
 // Sample the value using Exponential Distribution

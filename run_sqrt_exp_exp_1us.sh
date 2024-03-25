@@ -1,7 +1,7 @@
 #!/bin/bash
 
 PERF=0
-RUNS=10
+RUNS=0
 PERCENTILE_1="50.0"
 PERCENTILE_2="99.9"
 
@@ -51,6 +51,10 @@ process() {
 }
 
 for l in ${SERVER_LAYOUT_LIST[@]}; do
+	if [ $l = "cFCFS" ]; then
+		CLIENT_FLOWS=4
+	fi
+
 	if [ $l = "cFCFS+cFCFS" ]; then
 		SERVER_NUMBER_OF_CORES="7"
 	elif [ $l = "dFCFS+cFCFS" ]; then
