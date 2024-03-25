@@ -2,8 +2,8 @@
 #include <stdlib.h>
 
 int cmp_func(const void * a, const void * b) {
-    int da = (*(int*)a);
-    int db = (*(int*)b);
+    unsigned long long int da = (*(unsigned long long int*)a);
+    unsigned long long int db = (*(unsigned long long int*)b);
 
     return da - db;
 }
@@ -22,22 +22,22 @@ int main(int argc, char **argv) {
     int n;
     int __attribute__((unused)) ret = fscanf(fp, "%d\n", &n);
 
-    int *arr = (int*) malloc(n * sizeof(int));
+    unsigned long long int *arr = (unsigned long long int*) malloc(n * sizeof(unsigned long long int));
     if(!arr) {
         exit(-1);
     }
 
-    int val;
+    unsigned long long int val;
     for(int i = 0; i < n; i++) {
-        ret = fscanf(fp, "%d\n", &val);
+        ret = fscanf(fp, "%llu\n", &val);
         arr[i] = val;
     }
 
     double p = strtod(argv[1], NULL);
     int percentile = (p/100.0) * n;
 
-    qsort(arr, n, sizeof(int), cmp_func);
-    printf("%d\n", arr[percentile]);
+    qsort(arr, n, sizeof(unsigned long long int), cmp_func);
+    printf("%llu\n", arr[percentile]);
 
     free(arr);
 

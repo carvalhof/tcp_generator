@@ -63,11 +63,6 @@ extern uint32_t frame_size;
 extern uint32_t min_lcores;
 extern uint32_t tcp_payload_size;
 
-double srv_mode;
-uint64_t srv_iterations0;
-uint64_t srv_iterations1;
-uint64_t srv_distribution;
-
 extern uint64_t TICKS_PER_US;
 extern uint32_t *nr_never_sent;
 extern uint16_t **flow_indexes_array;
