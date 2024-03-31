@@ -91,7 +91,7 @@ struct rte_mbuf* create_syn_packet(uint16_t i) {
 	tcp_options_ws_t *tcp_ws = (tcp_options_ws_t*)(((uint8_t*) tcp_hdr) + sizeof(struct rte_tcp_hdr));
 	tcp_ws->kind = 0x03;
 	tcp_ws->length = 0x03;
-	tcp_ws->shift = 0x0a;
+	tcp_ws->shift = 0x02;
 	tcp_ws->nop = 0x01;
 	
 	tcp_options_mss_t *tcp_mss = (tcp_options_mss_t*)(((uint8_t*) tcp_ws) + sizeof(tcp_options_ws_t));
