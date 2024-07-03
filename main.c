@@ -339,7 +339,7 @@ int main(int argc, char **argv) {
 
 	// initialize DPDK
 	uint16_t portid = 0;
-	init_DPDK(portid, 1, seed);
+	init_DPDK(portid, seed);
 
 	// create nodes for incoming packets
 	create_incoming_array();
