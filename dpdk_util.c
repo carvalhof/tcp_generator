@@ -1,7 +1,7 @@
 #include "dpdk_util.h"
 
 // Initialize DPDK configuration
-void init_DPDK(uint16_t portid, uint64_t nr_queues, uint32_t seed) {
+void init_DPDK(uint16_t portid, uint32_t seed) {
 	// check the number of DPDK logical cores
 	if(rte_lcore_count() < min_lcores) {
 		rte_exit(EXIT_FAILURE, "No available worker cores!\n");
@@ -33,7 +33,7 @@ void init_DPDK(uint16_t portid, uint64_t nr_queues, uint32_t seed) {
 
 	// initialize the DPDK port
 	uint16_t nb_rx_queue = 1;
-	uint16_t nb_tx_queue = nr_queues;
+	uint16_t nb_tx_queue = 1;
 
 	if(init_DPDK_port(portid, nb_rx_queue, nb_tx_queue) != 0) {
 		rte_exit(EXIT_FAILURE, "Cannot init port %"PRIu8 "\n", 0);
