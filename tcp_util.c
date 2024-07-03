@@ -25,7 +25,7 @@ void init_tcp_blocks() {
 		tcp_control_blocks[i].src_port = src_tcp_port;
 		tcp_control_blocks[i].dst_port = rte_cpu_to_be_16(dst_tcp_port);
 
-		uint32_t seq = htonl(1);//rte_rand();
+		uint32_t seq = rte_rand();
 		tcp_control_blocks[i].tcb_seq_ini = seq;
 		tcp_control_blocks[i].tcb_next_seq = seq;
 
@@ -78,19 +78,17 @@ struct rte_mbuf* create_syn_packet(uint16_t i) {
 
 	// fill TCP information
 	struct rte_tcp_hdr *tcp_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_tcp_hdr *, sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv4_hdr));
-	tcp_hdr->dst_port = block->dst_port;
 	tcp_hdr->src_port = block->src_port;
-	// tcp_hdr->data_off = 0x50;
-	tcp_hdr->data_off = 0x70;//((sizeof(struct rte_tcp_hdr) + sizeof(tcp_options_ws_t)) << 4);
+	tcp_hdr->dst_port = block->dst_port;
 	tcp_hdr->sent_seq = block->tcb_seq_ini;
 	tcp_hdr->recv_ack = 0;
-	tcp_hdr->rx_win = 0xFFFF;
+	tcp_hdr->data_off = ((sizeof(struct rte_tcp_hdr) + sizeof(tcp_options_ws_t) + sizeof(tcp_options_mss_t)) >> 2) << 4;
 	tcp_hdr->tcp_flags = RTE_TCP_SYN_FLAG;
-	tcp_hdr->tcp_urp = 0;
+	tcp_hdr->rx_win = 0xFFFF;
 	tcp_hdr->cksum = 0;
+	tcp_hdr->tcp_urp = 0;
 
-	//tcp_options_ws_t *tcp_ws = (tcp_options_ws_t*)(((uint8_t*) tcp_hdr) + sizeof(struct rte_ether_hdr));
-	tcp_options_ws_t *tcp_ws = (tcp_options_ws_t*)(((uint8_t*) tcp_hdr) + 20);
+	tcp_options_ws_t *tcp_ws = (tcp_options_ws_t*)(((uint8_t*) tcp_hdr) + sizeof(struct rte_tcp_hdr));
 	tcp_ws->kind = 0x03;
 	tcp_ws->length = 0x03;
 	tcp_ws->shift = 0x0a;
@@ -102,7 +100,6 @@ struct rte_mbuf* create_syn_packet(uint16_t i) {
 	tcp_mss->value = htons(65535);
 
 	// fill the packet size
-	// pkt->data_len = sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv4_hdr) + sizeof(struct rte_tcp_hdr);
 	pkt->data_len = sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv4_hdr) + sizeof(struct rte_tcp_hdr) + sizeof(tcp_options_ws_t) + sizeof(tcp_options_mss_t);
 	pkt->pkt_len = pkt->data_len;
 
@@ -147,15 +144,15 @@ struct rte_mbuf *create_ack_packet(uint16_t i) {
 
 	// fill TCP information
 	struct rte_tcp_hdr *tcp_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_tcp_hdr *, sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv4_hdr));
-	tcp_hdr->dst_port = block->dst_port;
 	tcp_hdr->src_port = block->src_port;
-	tcp_hdr->data_off = 0x50;
+	tcp_hdr->dst_port = block->dst_port;
 	tcp_hdr->sent_seq = newseq;
 	tcp_hdr->recv_ack = rte_atomic32_read(&block->tcb_next_ack);
-	tcp_hdr->rx_win = 0xFFFF;
+	tcp_hdr->data_off = (sizeof(struct rte_tcp_hdr) >> 2) << 4;
 	tcp_hdr->tcp_flags = RTE_TCP_ACK_FLAG;
-	tcp_hdr->tcp_urp = 0;
+	tcp_hdr->rx_win = 0xFFFF;
 	tcp_hdr->cksum = 0;
+	tcp_hdr->tcp_urp = 0;
 
 	// fill the packet size
 	pkt->data_len = sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv4_hdr) + sizeof(struct rte_tcp_hdr);
@@ -240,13 +237,13 @@ void fill_tcp_packet(tcp_control_block_t *block, struct rte_mbuf *pkt) {
 	struct rte_tcp_hdr *tcp_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_tcp_hdr *, sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv4_hdr));
 	tcp_hdr->dst_port = block->dst_port;
 	tcp_hdr->src_port = block->src_port;
-	tcp_hdr->data_off = 0x50;
 	tcp_hdr->sent_seq = sent_seq;
 	tcp_hdr->recv_ack = rte_atomic32_read(&block->tcb_next_ack);
-	tcp_hdr->rx_win = 0xFFFF;
+	tcp_hdr->data_off = (sizeof(struct rte_tcp_hdr) >> 2) << 4;
 	tcp_hdr->tcp_flags = RTE_TCP_PSH_FLAG|RTE_TCP_ACK_FLAG;
-	tcp_hdr->tcp_urp = 0;
+	tcp_hdr->rx_win = 0xFFFF;
 	tcp_hdr->cksum = 0;
+	tcp_hdr->tcp_urp = 0;
 
 	// updates the TCP SEQ number
 	sent_seq = rte_cpu_to_be_32(rte_be_to_cpu_32(sent_seq) + tcp_payload_size);

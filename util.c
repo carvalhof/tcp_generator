@@ -41,39 +41,31 @@ static double process_double_arg(const char *arg) {
 
 // Allocate and create all application nodes
 void create_application_array() {
-	uint64_t rate_per_queue = rate/nr_queues;
-	uint64_t nr_elements_per_queue = (2 * rate_per_queue * duration);
+	uint64_t nr_elements = rate * duration;
 
-	application_array = (application_node_t**) rte_malloc(NULL, nr_queues * sizeof(application_node_t*), 64);
+	application_array = (application_node_t*) rte_malloc(NULL, nr_elements * sizeof(application_node_t), 64);
 	if(application_array == NULL) {
 		rte_exit(EXIT_FAILURE, "Cannot alloc the application array.\n");
 	}
 
-	for(uint64_t i = 0; i < nr_queues; i++) {
-		application_array[i] = (application_node_t*) rte_malloc(NULL, nr_elements_per_queue * sizeof(application_node_t), 0);
-		if(application_array[i] == NULL) {
-			rte_exit(EXIT_FAILURE, "Cannot alloc the application array.\n");
+	if(srv_distribution == CONSTANT_VALUE) {
+		for(uint32_t j = 0; j < nr_elements; j++) {
+			application_array[j].iterations = srv_iterations0;
+			application_array[j].randomness = rte_rand();
 		}
-
-		if(srv_distribution == CONSTANT_VALUE) {
-			for(uint32_t j = 0; j < nr_elements_per_queue; j++) {
-				application_array[i][j].iterations = srv_iterations0;
-				application_array[i][j].randomness = rte_rand();
-			}
-		} else if(srv_distribution == EXPONENTIAL_VALUE) {
-			for(uint32_t j = 0; j < nr_elements_per_queue; j++) {
-				double u = rte_drand();
-				application_array[i][j].iterations = (uint64_t) (-((double)srv_iterations0) * log(u));
-				application_array[i][j].randomness = rte_rand();
-			}
-		} else {
-			for(uint32_t j = 0; j < nr_elements_per_queue; j++) {
-				double u = rte_drand();
-				if(u < srv_mode) {
-					application_array[i][j].iterations = srv_iterations0;
-				} else {
-					application_array[i][j].iterations = srv_iterations1;
-				}
+	} else if(srv_distribution == EXPONENTIAL_VALUE) {
+		for(uint32_t j = 0; j < nr_elements; j++) {
+			double u = rte_drand();
+			application_array[j].iterations = (uint64_t) (-((double)srv_iterations0) * log(u));
+			application_array[j].randomness = rte_rand();
+		}
+	} else {
+		for(uint32_t j = 0; j < nr_elements; j++) {
+			double u = rte_drand();
+			if(u < srv_mode) {
+				application_array[j].iterations = srv_iterations0;
+			} else {
+				application_array[j].iterations = srv_iterations1;
 			}
 		}
 	}
@@ -81,7 +73,7 @@ void create_application_array() {
 
 // Allocate and create all nodes for incoming packets
 void create_incoming_array() {
-	incoming_array = (node_t*) rte_malloc(NULL, rate * duration * 2 * sizeof(node_t), 0);
+	incoming_array = (node_t*) rte_malloc(NULL, rate * duration * sizeof(node_t), 64);
 	if(incoming_array == NULL) {
 		rte_exit(EXIT_FAILURE, "Cannot alloc the incoming array.\n");
 	}
@@ -89,101 +81,70 @@ void create_incoming_array() {
 
 // Allocate and create an array for all interarrival packets for rate specified.
 void create_interarrival_array() {
-	uint64_t rate_per_queue = rate/nr_queues;
-	uint64_t nr_elements_per_queue = 2 * rate_per_queue * duration;
+	uint64_t nr_elements = rate * duration;
 
-	assert(rate_per_queue > 0);
-
-	interarrival_array = (uint32_t**) rte_malloc(NULL, nr_queues * sizeof(uint32_t*), 64);
+	interarrival_array = (uint32_t*) rte_malloc(NULL, nr_elements * sizeof(uint32_t), 0);
 	if(interarrival_array == NULL) {
 		rte_exit(EXIT_FAILURE, "Cannot alloc the interarrival_gap array.\n");
 	}
-
-	nr_never_sent = (uint32_t*) rte_zmalloc(NULL, nr_queues * sizeof(uint32_t), 64);
-	if(nr_never_sent == NULL) {
-		rte_exit(EXIT_FAILURE, "Cannot alloc the nr_never_sent array.\n");
+	
+	if(distribution == UNIFORM_VALUE) {
+		// Uniform
+		double mean = (1.0/rate) * 1000000.0;
+		for(uint64_t j = 0; j < nr_elements; j++) {
+			interarrival_array[j] = mean * TICKS_PER_US;
+		}
+	} else if(distribution == EXPONENTIAL_VALUE) {
+		// Exponential
+		double lambda = 1.0/(1000000.0/rate);
+		for(uint64_t j = 0; j < nr_elements; j++) {
+			interarrival_array[j] = sample_exponential(lambda) * TICKS_PER_US;
+		}
+	} else if(distribution == LOGNORMAL_VALUE) {
+		// Log-normal
+		double mean = (1.0/rate) * 1000000.0;
+		double sigma = sqrt(2*(log(mean) - log(mean/2)));
+		double u = log(mean) - (sigma*sigma)/2;
+		for(uint64_t j = 0; j < nr_elements; j++) {
+			interarrival_array[j] = sample_lognormal(u, sigma) * TICKS_PER_US;
+		}
+	} else if(distribution == PARETO_VALUE) {
+		// Pareto
+		double mean = (1.0/rate) * 1000000.0;
+		double alpha = 1.0 + mean / (mean - 1.0);
+		double xm = mean * (alpha - 1) / (alpha);
+		for(uint64_t j = 0; j < nr_elements; j++) {
+			interarrival_array[j] = sample_pareto(alpha, xm) * TICKS_PER_US;
+		}
+	} else {
+		exit(-1);
 	}
-
-	for(uint64_t i = 0; i < nr_queues; i++) {
-		interarrival_array[i] = (uint32_t*) rte_malloc(NULL, nr_elements_per_queue * sizeof(uint32_t), 0);
-		if(interarrival_array[i] == NULL) {
-			rte_exit(EXIT_FAILURE, "Cannot alloc the interarrival_gap array.\n");
-		}
-		
-		uint32_t *interarrival_gap = interarrival_array[i];
-		if(distribution == UNIFORM_VALUE) {
-			// Uniform
-			double mean = (1.0/rate_per_queue) * 1000000.0;
-			for(uint64_t j = 0; j < nr_elements_per_queue; j++) {
-				interarrival_gap[j] = mean * TICKS_PER_US;
-			}
-		} else if(distribution == EXPONENTIAL_VALUE) {
-			// Exponential
-			double lambda = 1.0/(1000000.0/rate_per_queue);
-			for(uint64_t j = 0; j < nr_elements_per_queue; j++) {
-				interarrival_gap[j] = sample_exponential(lambda) * TICKS_PER_US;
-			}
-		} else if(distribution == LOGNORMAL_VALUE) {
-			// Log-normal
-			double mean = (1.0/rate_per_queue) * 1000000.0;
-			double sigma = sqrt(2*(log(mean) - log(mean/2)));
-			double u = log(mean) - (sigma*sigma)/2;
-			for(uint64_t j = 0; j < nr_elements_per_queue; j++) {
-				interarrival_gap[j] = sample_lognormal(u, sigma) * TICKS_PER_US;
-			}
-		} else if(distribution == PARETO_VALUE) {
-			// Pareto
-			double mean = (1.0/rate_per_queue) * 1000000.0;
-			double alpha = 1.0 + mean / (mean - 1.0);
-			double xm = mean * (alpha - 1) / (alpha);
-			for(uint64_t j = 0; j < nr_elements_per_queue; j++) {
-				interarrival_gap[j] = sample_pareto(alpha, xm) * TICKS_PER_US;
-			}
-		} else {
-			exit(-1);
-		}
-	} 
 }
 
 // Allocate and create an array for all flow indentier to send to the server
 void create_flow_indexes_array() {
-	uint64_t rate_per_queue = rate/nr_queues;
-	uint64_t nr_elements_per_queue = 2 * rate_per_queue * duration;
+	uint64_t nr_elements = rate * duration;
 
-	flow_indexes_array = (uint16_t**) rte_malloc(NULL, nr_queues * sizeof(uint16_t*), 64);
+	flow_indexes_array = (uint16_t*) rte_malloc(NULL, nr_elements * sizeof(uint16_t), 64);
 	if(flow_indexes_array == NULL) {
 		rte_exit(EXIT_FAILURE, "Cannot alloc the flow_indexes array.\n");
 	}
 
-	for(uint64_t i = 0; i < nr_queues; i++) {
-		flow_indexes_array[i] = (uint16_t*) rte_malloc(NULL, nr_elements_per_queue * sizeof(uint16_t), 0);
-		if(flow_indexes_array[i] == NULL) {
-			rte_exit(EXIT_FAILURE, "Cannot alloc the flow_indexes array.\n");
-		}
+	uint32_t last = 0;
+	for(uint64_t i = 0; i < nr_flows; i++) {
+		flow_indexes_array[last++] = i;
 	}
 
-	uint32_t last[nr_queues];
-	memset(last, 0, nr_queues * sizeof(uint32_t));
-
-	for(uint64_t f = 0; f < nr_flows; f++) {
-		uint32_t idx = f % nr_queues;
-		flow_indexes_array[idx][last[idx]++] = f;
-	}
-
-	for(uint64_t q = 0; q < nr_queues; q++) {
-		for(uint32_t i = last[q]; i < nr_elements_per_queue; i++) {
-			flow_indexes_array[q][i] = flow_indexes_array[q][rand() % last[q]];
-		}
+	for(uint64_t i = last; i < nr_elements; i++) {
+		flow_indexes_array[i] = i % nr_flows;
 	}
 }
 
 // Clean up all allocate structures
 void clean_heap() {
 	rte_free(incoming_array);
-	for(uint64_t q = 0; q < nr_queues; q++) {
-		rte_free(flow_indexes_array[q]);
-		rte_free(interarrival_array[q]);
-	}
+	rte_free(flow_indexes_array);
+	rte_free(interarrival_array);
 	rte_free(application_array);
 }
 
@@ -195,9 +156,8 @@ static void usage(const char *prgname) {
 		"  -f FLOWS: number of flows\n"
 		"  -s SIZE: frame size in bytes\n"
 		"  -t TIME: time in seconds to send packets\n"
-		"  -q QUEUES: number of queues\n"
 		"  -e SEED: seed\n"
-		"  -D DISTRIBUTION: <uniform|exponential|bimodal> on the server\n"
+		"  -D DISTRIBUTION: <constant|exponential|bimodal> on the server\n"
 		"  -i INSTRUCTIONS: number of instructions on the server\n"
 		"  -j INSTRUCTIONS: number of instructions on the server\n"
 		"  -m MODE: mode for Bimodal distribution\n"
@@ -214,7 +174,7 @@ int app_parse_args(int argc, char **argv) {
 	char *prgname = argv[0];
 
 	argvopt = argv;
-	while ((opt = getopt(argc, argvopt, "d:r:f:s:q:p:t:c:o:e:D:i:j:m:")) != EOF) {
+	while ((opt = getopt(argc, argvopt, "d:r:f:s:t:c:o:e:D:i:j:m:")) != EOF) {
 		switch (opt) {
 		// distribution on the client
 		case 'd':
@@ -294,13 +254,6 @@ int app_parse_args(int argc, char **argv) {
 			duration = process_int_arg(optarg);
 			assert(duration > 0);
 			break;
-		
-		// queues
-		case 'q':
-			nr_queues = process_int_arg(optarg);
-			assert(nr_queues > 0);
-			min_lcores = 1 + 2 + nr_queues;
-			break;
 
 		// seed
 		case 'e':
@@ -327,10 +280,6 @@ int app_parse_args(int argc, char **argv) {
 		argv[optind - 1] = prgname;
 	}
 
-	if(nr_flows < nr_queues) {
-		rte_exit(EXIT_FAILURE, "The number of flows should be bigger than the number of queues.\n");
-	}
-
 	ret = optind-1;
 	optind = 1;
 
@@ -340,7 +289,7 @@ int app_parse_args(int argc, char **argv) {
 // Wait for the duration parameter
 void wait_timeout() {
 	uint32_t remaining_in_s = 5;
-	rte_delay_us_sleep((2 * duration + remaining_in_s) * 1000000);
+	rte_delay_us_sleep((duration + remaining_in_s) * 1000000);
 
 	// set quit flag for all internal cores
 	quit_rx = 1;
@@ -358,12 +307,9 @@ int cmp_func(const void * a, const void * b) {
 
 // Print stats into output file
 void print_stats_output() {
-	uint64_t total_never_sent = 0;
-	for(uint32_t i = 0; i < nr_queues; i++) {
-		total_never_sent += nr_never_sent[i];
-	}
+	uint64_t total_never_sent = nr_never_sent;
 	
-	if((incoming_idx + total_never_sent) != 2 * rate * duration) {
+	if((incoming_idx + total_never_sent) != rate * duration) {
 		printf("ERROR: received %d and %ld never sent\n", incoming_idx, total_never_sent);
 		return;
 	}
@@ -375,12 +321,10 @@ void print_stats_output() {
 	}
 
 	printf("\nincoming_idx = %d -- never_sent = %ld\n", incoming_idx, total_never_sent);
-	//uint64_t j = rate * duration - total_never_sent;
-	uint64_t j = (incoming_idx * 2)/10;
 
 	// print the RTT latency in (ns)
 	node_t *cur;
-	for(; j < incoming_idx; j++) {
+	for(uint64_t j = 0; j < incoming_idx; j++) {
 		cur = &incoming_array[j];
 
 		fprintf(fp, "%lu\t%lu\t0x%02lx\n", 

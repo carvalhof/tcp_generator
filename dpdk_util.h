@@ -20,13 +20,13 @@
 
 #include "tcp_util.h"
 
-#define BURST_SIZE 			32
-#define RING_ELEMENTS 			32*1024
-#define MEMPOOL_CACHE_SIZE 		512
-#define MAX_RTE_FLOW_PATTERN 		4
-#define MAX_RTE_FLOW_ACTIONS 		4
-#define PKTMBUF_POOL_ELEMENTS		256*1024 - 1
-#define RTE_LOGTYPE_TCP_GENERATOR 	RTE_LOGTYPE_USER1
+#define BURST_SIZE                  32
+#define RING_ELEMENTS               32*1024
+#define MEMPOOL_CACHE_SIZE          512
+#define MAX_RTE_FLOW_PATTERN        4
+#define MAX_RTE_FLOW_ACTIONS        4
+#define PKTMBUF_POOL_ELEMENTS       256*1024 - 1
+#define RTE_LOGTYPE_TCP_GENERATOR   RTE_LOGTYPE_USER1
 
 extern uint32_t min_lcores;
 extern uint64_t TICKS_PER_US;

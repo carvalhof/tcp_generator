@@ -35,12 +35,6 @@
 
 #define PAYLOAD_OFFSET				14+20+20
 
-typedef struct lcore_parameters {
-	uint8_t qid;
-	uint16_t portid;
-	uint64_t nr_elements;
-} __rte_cache_aligned lcore_param;
-
 typedef struct timestamp_node_t {
 	uint64_t timestamp_rx;
 	uint64_t timestamp_tx;
@@ -58,7 +52,6 @@ extern uint32_t seed;
 extern uint16_t portid;
 extern uint64_t duration;
 extern uint64_t nr_flows;
-extern uint64_t nr_queues;
 extern uint32_t frame_size;
 extern uint32_t min_lcores;
 extern uint32_t tcp_payload_size;
@@ -69,9 +62,9 @@ uint64_t srv_iterations1;
 uint64_t srv_distribution;
 
 extern uint64_t TICKS_PER_US;
-extern uint32_t *nr_never_sent;
-extern uint16_t **flow_indexes_array;
-extern uint32_t **interarrival_array;
+extern uint32_t nr_never_sent;
+extern uint16_t *flow_indexes_array;
+extern uint32_t *interarrival_array;
 
 extern uint16_t dst_tcp_port;
 extern uint32_t dst_ipv4_addr;
@@ -85,7 +78,7 @@ extern uint8_t quit_rx_ring;
 
 extern uint32_t incoming_idx;
 extern node_t *incoming_array;
-extern application_node_t **application_array;
+extern application_node_t *application_array;
 
 void clean_heap();
 void wait_timeout();
