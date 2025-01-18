@@ -161,6 +161,7 @@ static void usage(const char *prgname) {
 		"  -s SIZE: frame size in bytes\n"
 		"  -t TIME: time in seconds to send packets\n"
 		"  -e SEED: seed\n"
+		"  -S: skip the 3-way handshake\n"
 		"  -D DISTRIBUTION: <constant|exponential|bimodal> on the server\n"
 		"  -i INSTRUCTIONS: number of instructions on the server\n"
 		"  -j INSTRUCTIONS: number of instructions on the server\n"
@@ -178,7 +179,7 @@ int app_parse_args(int argc, char **argv) {
 	char *prgname = argv[0];
 
 	argvopt = argv;
-	while ((opt = getopt(argc, argvopt, "d:r:f:s:t:c:o:e:D:i:j:m:")) != EOF) {
+	while ((opt = getopt(argc, argvopt, "d:r:f:s:t:c:o:e:D:i:j:m:S")) != EOF) {
 		switch (opt) {
 		// distribution on the client
 		case 'd':
@@ -272,6 +273,11 @@ int app_parse_args(int argc, char **argv) {
 		// output mode
 		case 'o':
 			strcpy(output_file, optarg);
+			break;
+
+		// skip the 3-way handshake
+		case 'S':
+			skip_3way = true;
 			break;
 
 		default:

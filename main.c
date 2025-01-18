@@ -25,6 +25,7 @@ uint32_t frame_size;
 uint32_t tcp_payload_size;
 
 // General variables
+bool skip_3way = false;
 uint64_t TICKS_PER_US;
 uint16_t *flow_indexes_array;
 uint32_t *interarrival_array;
@@ -357,7 +358,8 @@ int main(int argc, char **argv) {
 	init_tcp_blocks();
 
 	// start client (3-way handshake for each flow)
-	start_client(portid);
+	if(!skip_3way)
+		start_client(portid);
 
 	// create the DPDK ring for RX thread
 	create_dpdk_ring();
