@@ -92,7 +92,6 @@ extern uint32_t src_ipv4_addr;
 extern struct rte_ether_addr dst_eth_addr;
 extern struct rte_ether_addr src_eth_addr;
 
-extern uint64_t srv_distribution;
 extern uint64_t srv_instructions;
 
 extern uint64_t nr_flows;
