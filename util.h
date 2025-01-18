@@ -56,6 +56,7 @@ extern uint32_t frame_size;
 extern uint32_t min_lcores;
 extern uint32_t tcp_payload_size;
 
+extern bool skip_3way;
 extern double srv_mode;
 extern uint64_t srv_iterations0;
 extern uint64_t srv_iterations1;
