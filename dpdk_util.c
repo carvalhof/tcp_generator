@@ -32,8 +32,8 @@ void init_DPDK(uint16_t portid, uint32_t seed) {
 	}
 
 	// initialize the DPDK port
-	uint16_t nb_rx_queue = 1;
-	uint16_t nb_tx_queue = 1;
+	uint16_t nb_rx_queue = 2;
+	uint16_t nb_tx_queue = 2;
 
 	if(init_DPDK_port(portid, nb_rx_queue, nb_tx_queue) != 0) {
 		rte_exit(EXIT_FAILURE, "Cannot init port %"PRIu8 "\n", 0);
@@ -197,6 +197,7 @@ void insert_flow(uint16_t portid, uint32_t i) {
 
 	attr.egress = 0;
 	attr.ingress = 1;
+	attr.priority = 2;
 
 	action[act_idx].type= RTE_FLOW_ACTION_TYPE_QUEUE;
 	action[act_idx].conf = &tcp_control_blocks[i].flow_queue_action;
@@ -221,6 +222,63 @@ void insert_flow(uint16_t portid, uint32_t i) {
 	pattern[pattern_idx].type = RTE_FLOW_ITEM_TYPE_TCP;
 	pattern[pattern_idx].spec = &tcp_control_blocks[i].flow_tcp;
 	pattern[pattern_idx].mask = &tcp_control_blocks[i].flow_tcp_mask;
+	pattern_idx++;
+
+	pattern[pattern_idx].type = RTE_FLOW_ITEM_TYPE_END;
+	pattern_idx++;
+
+	// validate the rte_flow
+	ret = rte_flow_validate(portid, &attr, pattern, action, &err);
+	if(ret < 0) {
+		RTE_LOG(ERR, TCP_GENERATOR, "Flow validation failed %s\n", err.message);
+		return;
+	}
+
+	// create the flow and insert to the NIC
+	struct rte_flow *rule = rte_flow_create(portid, &attr, pattern, action, &err);
+	if (rule == NULL) {
+		RTE_LOG(ERR, TCP_GENERATOR, "Flow creation return %s\n", err.message);
+	}
+}
+
+// Create and fill rte_flow to send to the NIC
+void insert_priority_flow(uint16_t portid, uint32_t i) {
+	int ret;
+	int act_idx = 0;
+	int pattern_idx = 0;
+	
+	struct rte_flow_attr attr = {};
+	struct rte_flow_error err = {};
+	struct rte_flow_item pattern[MAX_RTE_FLOW_PATTERN] = {};
+	struct rte_flow_action action[MAX_RTE_FLOW_ACTIONS] = {};
+
+	attr.egress = 0;
+	attr.ingress = 1;
+	attr.priority = 0;
+
+	action[act_idx].type= RTE_FLOW_ACTION_TYPE_QUEUE;
+	action[act_idx].conf = &tcp_control_blocks[i].flow_queue_action_priority;
+	act_idx++;
+
+	action[act_idx].type = RTE_FLOW_ACTION_TYPE_MARK;
+	action[act_idx].conf = &tcp_control_blocks[i].flow_mark_action;
+	act_idx++;
+
+	action[act_idx].type = RTE_FLOW_ACTION_TYPE_END;
+	action[act_idx].conf = NULL;
+	act_idx++;
+
+	pattern[pattern_idx].type = RTE_FLOW_ITEM_TYPE_ETH;
+	pattern_idx++;
+
+	pattern[pattern_idx].type = RTE_FLOW_ITEM_TYPE_IPV4;
+	pattern[pattern_idx].spec = &tcp_control_blocks[i].flow_ipv4;
+	pattern[pattern_idx].mask = &tcp_control_blocks[i].flow_ipv4_mask;
+	pattern_idx++;
+
+	pattern[pattern_idx].type = RTE_FLOW_ITEM_TYPE_TCP;
+	pattern[pattern_idx].spec = &tcp_control_blocks[i].flow_tcp_priority;
+	pattern[pattern_idx].mask = &tcp_control_blocks[i].flow_tcp_priority_mask;
 	pattern_idx++;
 
 	pattern[pattern_idx].type = RTE_FLOW_ITEM_TYPE_END;

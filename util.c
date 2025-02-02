@@ -307,6 +307,13 @@ void wait_timeout() {
 	quit_rx_ring = 1;
 }
 
+// Wait for the duration parameter
+void wait_timeout_for_fin() {
+	uint32_t remaining_in_s = 2;
+	rte_delay_us_sleep((remaining_in_s) * 1000000);
+	quit_rx_fin = 1;
+}
+
 // Compare two double values (for qsort function)
 int cmp_func(const void * a, const void * b) {
 	double da = (*(double*)a);

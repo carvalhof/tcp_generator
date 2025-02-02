@@ -20,17 +20,17 @@
 // TCP State enum
 typedef enum {
 	TCP_INIT,
-    	TCP_LISTEN,
-    	TCP_SYN_SENT,
-    	TCP_SYN_RECV,
-    	TCP_ESTABLISHED,
-    	TCP_FIN_WAIT_I,
-    	TCP_FIN_WAIT_II,
-    	TCP_LAST_ACK,
-    	TCP_CLOSING,
-    	TCP_TIME_WAIT,
-    	TCP_CLOSE_WAIT,
-    	TCP_CLOSED,
+	TCP_LISTEN,
+	TCP_SYN_SENT,
+	TCP_SYN_RECV,
+	TCP_ESTABLISHED,
+	TCP_FIN_WAIT_I,
+	TCP_FIN_WAIT_II,
+	TCP_LAST_ACK,
+	TCP_CLOSING,
+	TCP_TIME_WAIT,
+	TCP_CLOSE_WAIT,
+	TCP_CLOSED,
 } tcb_state_t;
 
 // TCP Control Block
@@ -62,8 +62,14 @@ typedef struct tcp_control_block_s {
 	struct rte_flow_item_ipv4		flow_ipv4_mask;
 	struct rte_flow_item_tcp		flow_tcp;
 	struct rte_flow_item_tcp		flow_tcp_mask;
+	//
+	struct rte_flow_item_tcp		flow_tcp_priority;
+	struct rte_flow_item_tcp		flow_tcp_priority_mask;
+	//
 	struct rte_flow_action_mark 	flow_mark_action;
 	struct rte_flow_action_queue 	flow_queue_action;
+	//
+	struct rte_flow_action_queue 	flow_queue_action_priority;
 
 } __rte_cache_aligned tcp_control_block_t;
 
@@ -107,6 +113,8 @@ struct rte_mbuf *create_ack_packet(uint16_t i);
 void fill_tcp_payload(uint8_t *payload, uint32_t length);
 struct rte_mbuf* process_syn_ack_packet(struct rte_mbuf* pkt);
 void fill_tcp_packet(tcp_control_block_t *block, struct rte_mbuf *pkt);
+void fill_tcp_packet_for_send_fin(tcp_control_block_t *block, struct rte_mbuf *pkt);
+void fill_tcp_packet_for_ack_incoming_fin(tcp_control_block_t *block, struct rte_mbuf *src, struct rte_mbuf *dst);
 void hot_fill_tcp_packet(tcp_control_block_t *block, struct rte_mbuf *pkt);
 
 #endif // __TCP_UTIL_H__

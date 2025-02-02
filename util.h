@@ -75,6 +75,7 @@ extern struct rte_ether_addr src_eth_addr;
 
 extern uint8_t quit_rx;
 extern uint8_t quit_tx;
+extern uint8_t quit_rx_fin;
 extern uint8_t quit_rx_ring;
 
 extern uint32_t incoming_idx;
@@ -83,6 +84,7 @@ extern application_node_t *application_array;
 
 void clean_heap();
 void wait_timeout();
+void wait_timeout_for_fin();
 void print_dpdk_stats();
 void print_stats_output();
 void process_config_file();

@@ -31,6 +31,7 @@ void init_tcp_blocks() {
 
 		tcp_control_blocks[i].flow_mark_action.id = i;
 		tcp_control_blocks[i].flow_queue_action.index = 0;
+		tcp_control_blocks[i].flow_queue_action_priority.index = 1;
 		tcp_control_blocks[i].flow_eth.type = ETH_IPV4_TYPE_NETWORK;
 		tcp_control_blocks[i].flow_eth_mask.type = 0xFFFF;
 		tcp_control_blocks[i].flow_ipv4.hdr.src_addr = tcp_control_blocks[i].dst_addr;
@@ -41,6 +42,13 @@ void init_tcp_blocks() {
 		tcp_control_blocks[i].flow_tcp.hdr.dst_port = tcp_control_blocks[i].src_port;
 		tcp_control_blocks[i].flow_tcp_mask.hdr.src_port = 0xFFFF;
 		tcp_control_blocks[i].flow_tcp_mask.hdr.dst_port = 0xFFFF;
+		//
+		tcp_control_blocks[i].flow_tcp_priority.hdr.src_port = tcp_control_blocks[i].dst_port;
+		tcp_control_blocks[i].flow_tcp_priority.hdr.dst_port = tcp_control_blocks[i].src_port;
+		tcp_control_blocks[i].flow_tcp_priority.hdr.tcp_flags = RTE_TCP_FIN_FLAG;
+		tcp_control_blocks[i].flow_tcp_priority_mask.hdr.src_port = 0xFFFF;
+		tcp_control_blocks[i].flow_tcp_priority_mask.hdr.dst_port = 0xFFFF;
+		tcp_control_blocks[i].flow_tcp_priority_mask.hdr.tcp_flags = RTE_TCP_FIN_FLAG;
 	}
 }
 
@@ -251,6 +259,103 @@ void fill_tcp_packet(tcp_control_block_t *block, struct rte_mbuf *pkt) {
 
 	// fill the packet size
 	pkt->data_len = frame_size;
+	pkt->pkt_len = pkt->data_len;
+}
+
+// Fill the TCP packets from TCP Control Block data
+void fill_tcp_packet_for_send_fin(tcp_control_block_t *block, struct rte_mbuf *pkt) {
+	// ensure that IP/TCP checksum offloadings
+	pkt->ol_flags |= (RTE_MBUF_F_TX_IPV4 | RTE_MBUF_F_TX_IP_CKSUM | RTE_MBUF_F_TX_TCP_CKSUM);
+
+	// fill Ethernet information
+	struct rte_ether_hdr *eth_hdr = (struct rte_ether_hdr *) rte_pktmbuf_mtod(pkt, struct ether_hdr*);
+	eth_hdr->dst_addr = dst_eth_addr;
+	eth_hdr->src_addr = src_eth_addr;
+	eth_hdr->ether_type = ETH_IPV4_TYPE_NETWORK;
+
+	// fill IPv4 information
+	struct rte_ipv4_hdr *ipv4_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_ipv4_hdr *, sizeof(struct rte_ether_hdr));
+	ipv4_hdr->version_ihl = 0x45;
+	ipv4_hdr->total_length = rte_cpu_to_be_16(sizeof(struct rte_ipv4_hdr) + sizeof(struct rte_tcp_hdr));
+	ipv4_hdr->time_to_live = 255;
+	ipv4_hdr->packet_id = 0;
+	ipv4_hdr->next_proto_id = IPPROTO_TCP;
+	ipv4_hdr->fragment_offset = 0;
+	ipv4_hdr->src_addr = block->src_addr;
+	ipv4_hdr->dst_addr = block->dst_addr;
+	ipv4_hdr->hdr_checksum = 0;
+
+	// set the TCP SEQ number
+	uint32_t sent_seq = block->tcb_next_seq;
+
+	// fill TCP information
+	struct rte_tcp_hdr *tcp_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_tcp_hdr *, sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv4_hdr));
+	tcp_hdr->dst_port = block->dst_port;
+	tcp_hdr->src_port = block->src_port;
+	tcp_hdr->sent_seq = sent_seq;
+	tcp_hdr->recv_ack = rte_atomic32_read(&block->tcb_next_ack);
+	tcp_hdr->data_off = (sizeof(struct rte_tcp_hdr) >> 2) << 4;
+	tcp_hdr->tcp_flags = RTE_TCP_FIN_FLAG|RTE_TCP_ACK_FLAG;
+	tcp_hdr->rx_win = 0xFFFF;
+	tcp_hdr->cksum = 0;
+	tcp_hdr->tcp_urp = 0;
+
+	// updates the TCP SEQ number
+	sent_seq = rte_cpu_to_be_32(rte_be_to_cpu_32(sent_seq) + 1);
+	block->tcb_next_seq = sent_seq;
+
+	// fill the packet size
+	pkt->data_len = sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv4_hdr) + sizeof(struct rte_tcp_hdr);
+	pkt->pkt_len = pkt->data_len;
+}
+
+// Fill the TCP packets from TCP Control Block data for ack the incoming FIN
+void fill_tcp_packet_for_ack_incoming_fin(tcp_control_block_t *block, struct rte_mbuf *src, struct rte_mbuf *pkt) {
+	// ensure that IP/TCP checksum offloadings
+	pkt->ol_flags |= (RTE_MBUF_F_TX_IPV4 | RTE_MBUF_F_TX_IP_CKSUM | RTE_MBUF_F_TX_TCP_CKSUM);
+
+	// fill Ethernet information
+	struct rte_ether_hdr *eth_hdr = (struct rte_ether_hdr *) rte_pktmbuf_mtod(pkt, struct ether_hdr*);
+	eth_hdr->dst_addr = dst_eth_addr;
+	eth_hdr->src_addr = src_eth_addr;
+	eth_hdr->ether_type = ETH_IPV4_TYPE_NETWORK;
+
+	// fill IPv4 information
+	struct rte_ipv4_hdr *ipv4_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_ipv4_hdr *, sizeof(struct rte_ether_hdr));
+	ipv4_hdr->version_ihl = 0x45;
+	ipv4_hdr->total_length = rte_cpu_to_be_16(sizeof(struct rte_ipv4_hdr) + sizeof(struct rte_tcp_hdr));
+	ipv4_hdr->time_to_live = 255;
+	ipv4_hdr->packet_id = 0;
+	ipv4_hdr->next_proto_id = IPPROTO_TCP;
+	ipv4_hdr->fragment_offset = 0;
+	ipv4_hdr->src_addr = block->src_addr;
+	ipv4_hdr->dst_addr = block->dst_addr;
+	ipv4_hdr->hdr_checksum = 0;
+
+	// set the TCP SEQ number
+	uint32_t sent_seq = block->tcb_next_seq;
+
+	// fill TCP information
+	struct rte_tcp_hdr *tcp_hdr = rte_pktmbuf_mtod_offset(pkt, struct rte_tcp_hdr *, sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv4_hdr));
+	tcp_hdr->dst_port = block->dst_port;
+	tcp_hdr->src_port = block->src_port;
+	tcp_hdr->sent_seq = sent_seq;
+	{
+		struct rte_tcp_hdr *tcp_hdr2 = rte_pktmbuf_mtod_offset(src, struct rte_tcp_hdr *, sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv4_hdr));
+		tcp_hdr->recv_ack = rte_cpu_to_be_32(rte_be_to_cpu_32(tcp_hdr2->sent_seq) + 1);
+	}
+	tcp_hdr->data_off = (sizeof(struct rte_tcp_hdr) >> 2) << 4;
+	tcp_hdr->tcp_flags = RTE_TCP_ACK_FLAG;
+	tcp_hdr->rx_win = 0xFFFF;
+	tcp_hdr->cksum = 0;
+	tcp_hdr->tcp_urp = 0;
+
+	// updates the TCP SEQ number
+	sent_seq = rte_cpu_to_be_32(rte_be_to_cpu_32(sent_seq));
+	block->tcb_next_seq = sent_seq;
+
+	// fill the packet size
+	pkt->data_len = sizeof(struct rte_ether_hdr) + sizeof(struct rte_ipv4_hdr) + sizeof(struct rte_tcp_hdr);
 	pkt->pkt_len = pkt->data_len;
 }
 

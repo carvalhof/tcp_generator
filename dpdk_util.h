@@ -38,6 +38,7 @@ extern struct rte_ring *rx_ring;
 void clean_hugepages();
 void print_DPDK_stats();
 void insert_flow(uint16_t portid, uint32_t i);
+void insert_priority_flow(uint16_t portid, uint32_t i);
 void init_DPDK(uint16_t portid, uint32_t seed);
 void create_dpdk_ring();
 int init_DPDK_port(uint16_t portid, uint16_t nb_rx_queue, uint16_t nb_tx_queue);
