@@ -71,7 +71,6 @@ int process_rx_pkt(struct rte_mbuf *pkt, node_t *incoming, uint32_t *incoming_id
 
 	// do not process empty packets
 	if(unlikely(packet_data_size == 0)) {
-		// TODO: why?
 		return 0;
 	}
 
@@ -85,11 +84,6 @@ int process_rx_pkt(struct rte_mbuf *pkt, node_t *incoming, uint32_t *incoming_id
 	// retrieve the index of the flow from the NIC (NIC tags the packet according the 5-tuple using DPDK rte_flow)
 	uint32_t flow_id = pkt->hash.fdir.hi;
 
-	// // sanity check
-	// if(unlikely(flow_id != f_id)) {
-	// 	return 0;
-	// }
-	
 	// get control block for the flow
 	tcp_control_block_t *block = &tcp_control_blocks[flow_id];
 
@@ -122,13 +116,13 @@ int process_rx_pkt(struct rte_mbuf *pkt, node_t *incoming, uint32_t *incoming_id
 
 // Start the client establishing all TCP connections
 void start_client(uint16_t portid) {
-	uint16_t nb_rx;
-	uint16_t nb_tx;
+	uint16_t nr_rx;
+	uint16_t nr_tx;
 	uint64_t ts_syn;
 	struct rte_mbuf *pkt;
 	struct rte_flow_error err;
 	tcp_control_block_t *block;
-	uint32_t nb_retransmission;
+	uint32_t nr_retransmission;
 	struct rte_mbuf *pkts[BURST_SIZE];
 
 	// flush all flow rules
@@ -140,24 +134,25 @@ void start_client(uint16_t portid) {
 	for(int i = 0; i < nr_flows; i++) {
 		// get the TCP control block for the flow
 		block = &tcp_control_blocks[i];
+
 		// create the TCP SYN packet
 		struct rte_mbuf *syn_packet = create_syn_packet(i);
 
 		// insert the rte_flow in the NIC to retrieve the flow id for incoming packets of this flow
 		insert_flow(portid, i);
 
-		// inserting priority flow for FIN segments
+		// insert priority flow for FIN segments
 		insert_priority_flow(portid, i);
 
 		// send the SYN packet
 		struct rte_mbuf *syn_cloned = rte_pktmbuf_clone(syn_packet, pktmbuf_pool_tx);
-		nb_tx = rte_eth_tx_burst(portid, 0, &syn_cloned, 1);
-		if(nb_tx != 1) {
+		nr_tx = rte_eth_tx_burst(portid, 0, &syn_cloned, 1);
+		if(nr_tx != 1) {
 			rte_exit(EXIT_FAILURE, "Error to send the TCP SYN packet.\n");
 		}
 
 		// clear the counters
-		nb_retransmission = 1;
+		nr_retransmission = 1;
 		ts_syn = rte_rdtsc();
 
 		// change the TCP state to SYN_SENT
@@ -166,33 +161,33 @@ void start_client(uint16_t portid) {
 		// while not received SYN+ACK packet and TCP state is not ESTABLISHED
 		while(rte_atomic16_read(&block->tcb_state) != TCP_ESTABLISHED) {
 			// receive TCP SYN+ACK packets from the NIC
-			nb_rx = rte_eth_rx_burst(portid, 0, pkts, BURST_SIZE);
+			nr_rx = rte_eth_rx_burst(portid, 0, pkts, BURST_SIZE);
 
-			for(int j = 0; j < nb_rx; j++) {
+			for(int j = 0; j < nr_rx; j++) {
 				// process the SYN+ACK packet, returning the ACK packet to send
 				pkt = process_syn_ack_packet(pkts[j]);
 				
 				if(pkt) {
 					// send the TCP ACK packet to the server
-					nb_tx = rte_eth_tx_burst(portid, 0, &pkt, 1);
-					if(nb_tx != 1) {
+					nr_tx = rte_eth_tx_burst(portid, 0, &pkt, 1);
+					if(nr_tx != 1) {
 						rte_exit(EXIT_FAILURE, "Error to send the TCP ACK packet.\n");
 					}
 				}
 			}
 			// free packets
-			rte_pktmbuf_free_bulk(pkts, nb_rx);
+			rte_pktmbuf_free_bulk(pkts, nr_rx);
 
-			if((rte_rdtsc() - ts_syn) > (nb_retransmission * HANDSHAKE_TIMEOUT_IN_US) * TICKS_PER_US) {
-				nb_retransmission++;
+			if((rte_rdtsc() - ts_syn) > (nr_retransmission * HANDSHAKE_TIMEOUT_IN_US) * TICKS_PER_US) {
+				nr_retransmission++;
 				syn_cloned = rte_pktmbuf_clone(syn_packet, pktmbuf_pool_tx);
-				nb_tx = rte_eth_tx_burst(portid, 0, &syn_cloned, 1);
-				if(nb_tx != 1) {
+				nr_tx = rte_eth_tx_burst(portid, 0, &syn_cloned, 1);
+				if(nr_tx != 1) {
 					rte_exit(EXIT_FAILURE, "Error to send the TCP SYN packet.\n");
 				}
 				ts_syn = rte_rdtsc();
 
-				if(nb_retransmission == HANDSHAKE_RETRANSMISSION) {
+				if(nr_retransmission == HANDSHAKE_RETRANSMISSION) {
 					rte_exit(EXIT_FAILURE, "Cannot establish connection.\n");
 				}
 			}
@@ -200,7 +195,7 @@ void start_client(uint16_t portid) {
 		rte_pktmbuf_free(syn_packet);
 	}
 
-	// Discard 3-way handshake packets in the DPDK metrics
+	// discard 3-way handshake packets in the DPDK metrics
 	rte_eth_stats_reset(portid);
 	rte_eth_xstats_reset(portid);
 	
@@ -209,17 +204,18 @@ void start_client(uint16_t portid) {
 
 // RX processing
 static int lcore_rx_ring(void *arg) {
-	uint16_t nb_rx;
+	uint16_t nr_rx;
 	struct rte_mbuf *pkts[BURST_SIZE];
 
 	incoming_idx = 0;
 
 	while(!quit_rx_ring) {
 		// retrieve packets from the RX core
-		nb_rx = rte_ring_sc_dequeue_burst(rx_ring, (void**) pkts, BURST_SIZE, NULL); 
-		for(int i = 0; i < nb_rx; i++) {
+		nr_rx = rte_ring_sc_dequeue_burst(rx_ring, (void**) pkts, BURST_SIZE, NULL); 
+		for(int i = 0; i < nr_rx; i++) {
 			// process the incoming packet
 			process_rx_pkt(pkts[i], incoming_array, &incoming_idx);
+
 			// free the packet
 			rte_pktmbuf_free(pkts[i]);
 		}
@@ -227,14 +223,15 @@ static int lcore_rx_ring(void *arg) {
 
 	// process all remaining packets that are in the RX ring (not from the NIC)
 	do {
-		nb_rx = rte_ring_sc_dequeue_burst(rx_ring, (void**) pkts, BURST_SIZE, NULL);
-		for(int i = 0; i < nb_rx; i++) {
+		nr_rx = rte_ring_sc_dequeue_burst(rx_ring, (void**) pkts, BURST_SIZE, NULL);
+		for(int i = 0; i < nr_rx; i++) {
 			// process the incoming packet
 			process_rx_pkt(pkts[i], incoming_array, &incoming_idx);
+
 			// free the packet
 			rte_pktmbuf_free(pkts[i]);
 		}
-	} while (nb_rx != 0);
+	} while (nr_rx != 0);
 
 	return 0;
 }
@@ -245,24 +242,24 @@ static int lcore_rx(void *arg) {
 	uint8_t qid = 0;
 
 	uint64_t now;
-	uint16_t nb_rx;
-	uint16_t nb_pkts;
+	uint16_t nr_rx;
+	uint16_t nr_pkts;
 	struct rte_mbuf *pkts[BURST_SIZE];
 	
 	while(!quit_rx) {
 		// retrieve the packets from the NIC
-		nb_rx = rte_eth_rx_burst(portid, qid, pkts, BURST_SIZE);
+		nr_rx = rte_eth_rx_burst(portid, qid, pkts, BURST_SIZE);
 
-		// retrive the current timestamp
+		// retrieve the current timestamp
 		now = rte_rdtsc();
-		for(int i = 0; i < nb_rx; i++) {
+		for(int i = 0; i < nr_rx; i++) {
 			// fill the timestamp into packet payload
 			fill_payload_pkt(pkts[i], 1, now);
 		}
 
 		// enqueue the packets to the ring
-		nb_pkts = rte_ring_sp_enqueue_burst(rx_ring, (void* const*) pkts, nb_rx, NULL);
-		if(unlikely(nb_pkts != nb_rx)) {
+		nr_pkts = rte_ring_sp_enqueue_burst(rx_ring, (void* const*) pkts, nr_rx, NULL);
+		if(unlikely(nr_pkts != nr_rx)) {
 			rte_exit(EXIT_FAILURE, "Cannot enqueue the packet to the RX thread: %s.\n", rte_strerror(errno));
 		}
 	}
@@ -272,12 +269,12 @@ static int lcore_rx(void *arg) {
 
 // RX FIN processing
 static int lcore_rx_fin(void *arg) {
-	uint16_t portid = 0;
 	uint8_t qid = 1;
+	uint16_t portid = 0;
 
 	uint64_t now;
-	uint16_t nb_rx;
 	uint32_t ret;
+	uint16_t nr_rx;
 	uint16_t active_flows = nr_flows;
 	struct rte_mbuf *pkts[BURST_SIZE];
 
@@ -288,11 +285,11 @@ static int lcore_rx_fin(void *arg) {
 			break;
 
 		// retrieve the packets from the NIC
-		nb_rx = rte_eth_rx_burst(portid, qid, pkts, BURST_SIZE);
+		nr_rx = rte_eth_rx_burst(portid, qid, pkts, BURST_SIZE);
 
-		// retrive the current timestamp
+		// retrieve the current timestamp
 		now = rte_rdtsc();
-		for(int i = 0; i < nb_rx; i++) {
+		for(int i = 0; i < nr_rx; i++) {
 			active_flows--;
 			struct rte_mbuf *pkt = pkts[i];
 			if(pkt->pkt_len != headers_len) {
@@ -310,15 +307,15 @@ static int lcore_rx_fin(void *arg) {
 				uint32_t flow_id = pkt->hash.fdir.hi;
 				tcp_control_block_t *block = &tcp_control_blocks[flow_id];
 
-				// allocated the packet
+				// allocate the packet
 				struct rte_mbuf *ack_pkt = rte_pktmbuf_alloc(pktmbuf_pool_tx);
 
 				// fill the packet fields
 				fill_tcp_packet_for_ack_incoming_fin(block, pkt, ack_pkt);
-				// ele tem que setar apenas ACK, pegar o seqFIN + 1 no ack
 
 				// send the packet
 				rte_eth_tx_burst(portid, qid, &ack_pkt, 1);
+
 				// update the TCP state
 				rte_atomic16_set(&block->tcb_state, TCP_FIN_WAIT_II);
 			} 
@@ -330,8 +327,8 @@ static int lcore_rx_fin(void *arg) {
 
 // Main TX processing
 static int lcore_tx(void *arg) {
-	uint16_t portid = 0;
 	uint8_t qid = 0;
+	uint16_t portid = 0;
 	uint64_t nr_elements = rate * duration;
 
 	struct rte_mbuf *pkt;
@@ -351,7 +348,7 @@ static int lcore_tx(void *arg) {
 		uint16_t flow_id = flow_indexes_array[i];
 		tcp_control_block_t *block = &tcp_control_blocks[flow_id];
 
-		// allocated the packet
+		// allocate the packet
 		pkt = rte_pktmbuf_alloc(pktmbuf_pool_tx);
 
 		// fill the packet fields
@@ -382,23 +379,26 @@ static int lcore_tx(void *arg) {
 		next_tsc += interarrival_array[i];
 	}
 
-	// We should sleep for while (1s)
+	// sleep for while (1s)
 	rte_delay_us_sleep(1000000);
 
 	// we need to send the FIN packet for all flows
-	for(uint64_t flow_id = 0; flow_id < nr_flows; flow_id++) {
-		tcp_control_block_t *block = &tcp_control_blocks[flow_id];
+	if(!skip_3way) {
+		for(uint64_t flow_id = 0; flow_id < nr_flows; flow_id++) {
+			tcp_control_block_t *block = &tcp_control_blocks[flow_id];
 
-		// allocated the packet
-		pkt = rte_pktmbuf_alloc(pktmbuf_pool_tx);
+			// allocate the packet
+			pkt = rte_pktmbuf_alloc(pktmbuf_pool_tx);
 
-		// fill the packet fields
-		fill_tcp_packet_for_send_fin(block, pkt);
+			// fill the packet fields
+			fill_tcp_packet_for_send_fin(block, pkt);
 
-		// send the packet
-		rte_eth_tx_burst(portid, qid, &pkt, 1);
-		// update the TCP state
-		rte_atomic16_set(&block->tcb_state, TCP_FIN_WAIT_I);
+			// send the packet
+			rte_eth_tx_burst(portid, qid, &pkt, 1);
+
+			// update the TCP state
+			rte_atomic16_set(&block->tcb_state, TCP_FIN_WAIT_I);
+		}
 	}
 
 	return 0;
@@ -457,8 +457,10 @@ int main(int argc, char **argv) {
 	rte_eal_remote_launch(lcore_rx, NULL, id_lcore);
 
 	// start RX thread to process incoming FIN packets
-	id_lcore = rte_get_next_lcore(id_lcore, 1, 1);
-	rte_eal_remote_launch(lcore_rx_fin, NULL, id_lcore);
+	if(!skip_3way) {
+		id_lcore = rte_get_next_lcore(id_lcore, 1, 1);
+		rte_eal_remote_launch(lcore_rx_fin, NULL, id_lcore);
+	}
 
 	// start TX thread
 	id_lcore = rte_get_next_lcore(id_lcore, 1, 1);

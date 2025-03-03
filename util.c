@@ -161,7 +161,7 @@ static void usage(const char *prgname) {
 		"  -s SIZE: frame size in bytes\n"
 		"  -t TIME: time in seconds to send packets\n"
 		"  -e SEED: seed\n"
-		"  -S: skip the 3-way handshake\n"
+		"  -S skip the 3-way handshake\n"
 		"  -D DISTRIBUTION: <constant|exponential|bimodal> on the server\n"
 		"  -i INSTRUCTIONS: number of instructions on the server\n"
 		"  -j INSTRUCTIONS: number of instructions on the server\n"

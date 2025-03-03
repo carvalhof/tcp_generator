@@ -32,19 +32,19 @@ void init_DPDK(uint16_t portid, uint32_t seed) {
 	}
 
 	// initialize the DPDK port
-	uint16_t nb_rx_queue = 2;
-	uint16_t nb_tx_queue = 2;
+	uint16_t nr_rx_queue = 2;
+	uint16_t nr_tx_queue = 2;
 
-	if(init_DPDK_port(portid, nb_rx_queue, nb_tx_queue) != 0) {
+	if(init_DPDK_port(portid, nr_rx_queue, nr_tx_queue) != 0) {
 		rte_exit(EXIT_FAILURE, "Cannot init port %"PRIu8 "\n", 0);
 	}
 }
 
 // Initialize the DPDK port
-int init_DPDK_port(uint16_t portid, uint16_t nb_rx_queue, uint16_t nb_tx_queue) {
-	// configurable number of RX/TX ring descriptors
-	uint16_t nb_rxd = 4096;
-	uint16_t nb_txd = 4096;
+int init_DPDK_port(uint16_t portid, uint16_t nr_rx_queue, uint16_t nr_tx_queue) {
+	// number of RX/TX ring descriptors
+	uint16_t nr_rxd = 4096;
+	uint16_t nr_txd = 4096;
 
 	struct rte_eth_dev_info dev_info;
 	int retval = rte_eth_dev_info_get(portid, &dev_info);
@@ -55,7 +55,7 @@ int init_DPDK_port(uint16_t portid, uint16_t nb_rx_queue, uint16_t nb_tx_queue) 
 	// get default port_conf
 	struct rte_eth_conf port_conf = {
 		.rxmode = {
-			.mq_mode = nb_rx_queue > 1 ? RTE_ETH_MQ_RX_RSS : RTE_ETH_MQ_RX_NONE,
+			.mq_mode = RTE_ETH_MQ_RX_NONE,
 			.max_lro_pkt_size = RTE_ETHER_MAX_LEN,
 			.offloads = RTE_ETH_RX_OFFLOAD_TCP_CKSUM|RTE_ETH_RX_OFFLOAD_IPV4_CKSUM,
 		},
@@ -67,19 +67,19 @@ int init_DPDK_port(uint16_t portid, uint16_t nb_rx_queue, uint16_t nb_tx_queue) 
 		},
 		.txmode = {
 			.mq_mode = RTE_ETH_MQ_TX_NONE,
-			// .offloads = RTE_ETH_TX_OFFLOAD_TCP_CKSUM|RTE_ETH_TX_OFFLOAD_IPV4_CKSUM|RTE_ETH_TX_OFFLOAD_MBUF_FAST_FREE,
-			.offloads = RTE_ETH_TX_OFFLOAD_TCP_CKSUM|RTE_ETH_TX_OFFLOAD_IPV4_CKSUM,
+			.offloads = RTE_ETH_TX_OFFLOAD_TCP_CKSUM|RTE_ETH_TX_OFFLOAD_IPV4_CKSUM|RTE_ETH_TX_OFFLOAD_MBUF_FAST_FREE,
+			// .offloads = RTE_ETH_TX_OFFLOAD_TCP_CKSUM|RTE_ETH_TX_OFFLOAD_IPV4_CKSUM,
 		},
 	};	
 
 	// configure the NIC
-	retval = rte_eth_dev_configure(portid, nb_rx_queue, nb_tx_queue, &port_conf);
+	retval = rte_eth_dev_configure(portid, nr_rx_queue, nr_tx_queue, &port_conf);
 	if(retval != 0) {
 		return retval;
 	}
 
 	// adjust and set up the number of RX/TX descriptors
-	retval = rte_eth_dev_adjust_nb_rx_tx_desc(portid, &nb_rxd, &nb_txd);
+	retval = rte_eth_dev_adjust_nb_rx_tx_desc(portid, &nr_rxd, &nr_txd);
 	if(retval != 0) {
 		return retval;
 	}
@@ -89,8 +89,8 @@ int init_DPDK_port(uint16_t portid, uint16_t nb_rx_queue, uint16_t nb_tx_queue) 
 	rx_conf.rx_drop_en = 1;
 
 	// setup the RX queues
-	for(int q = 0; q < nb_rx_queue; q++) {
-		retval = rte_eth_rx_queue_setup(portid, q, nb_rxd, rte_eth_dev_socket_id(portid), &rx_conf, pktmbuf_pool_rx);
+	for(int q = 0; q < nr_rx_queue; q++) {
+		retval = rte_eth_rx_queue_setup(portid, q, nr_rxd, rte_eth_dev_socket_id(portid), &rx_conf, pktmbuf_pool_rx);
 		if (retval < 0) {
 			return retval;
 		}
@@ -100,8 +100,8 @@ int init_DPDK_port(uint16_t portid, uint16_t nb_rx_queue, uint16_t nb_tx_queue) 
 	tx_conf.offloads = port_conf.txmode.offloads;
 
 	// setup the TX queues
-	for(int q = 0; q < nb_tx_queue; q++) {
-		retval = rte_eth_tx_queue_setup(portid, q, nb_txd, rte_eth_dev_socket_id(portid), &tx_conf);
+	for(int q = 0; q < nr_tx_queue; q++) {
+		retval = rte_eth_tx_queue_setup(portid, q, nr_txd, rte_eth_dev_socket_id(portid), &tx_conf);
 		if (retval < 0) {
 			return retval;
 		}
